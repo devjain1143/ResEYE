@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import StudentCard from '../components/StudentCard';
 import Mark from '../marks/Mark';
@@ -114,18 +115,116 @@ export default function PinnedTapes({ user }) {
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty State with Visual Tutorial */}
       {!loading && !error && pinnedList.length === 0 && (
-        <div className="border border-white/20 p-12 text-center space-y-4 bg-black">
-          <div className="flex justify-center opacity-40">
-            <Mark name="bison" size={48} />
+        <div className="border-2 border-white/30 bg-black p-6 sm:p-10 space-y-8 relative overflow-hidden font-terminal">
+          {/* Scanline subtle layer */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-15"
+            style={{
+              backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%)',
+              backgroundSize: '100% 3px',
+            }}
+          />
+
+          {/* Heading */}
+          <div className="text-center space-y-2 relative z-10">
+            <div className="inline-block bg-white text-black font-bold text-xs px-2.5 py-0.5 tracking-widest uppercase">
+              CH 02 // SURVEILLANCE PROTOCOL
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-widest glitch text-white" data-text="[ OPERATOR VAULT IS CURRENTLY EMPTY ]">
+              [ OPERATOR VAULT IS CURRENTLY EMPTY ]
+            </h2>
+            <p className="font-typewriter text-xs sm:text-sm text-white/70 max-w-xl mx-auto leading-relaxed">
+              No academic tapes are currently locked to your monitored shelf. Follow the operational protocol below to bookmark dossiers for instant access.
+            </p>
           </div>
-          <div className="text-xl tracking-widest font-bold">
-            [ OPERATOR VAULT IS CURRENTLY EMPTY ]
+
+          {/* 3-Step Tutorial Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
+            {/* Step 1 */}
+            <div className="border border-white/20 bg-white/5 p-5 flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono text-white/50 border-b border-white/10 pb-2">
+                  <span>PHASE 01</span>
+                  <span>QUERY ARCHIVE</span>
+                </div>
+                <div className="text-sm font-bold text-white tracking-wider">
+                  1. RETRIEVE A DOSSIER
+                </div>
+                <p className="text-xs text-white/75 font-mono leading-relaxed">
+                  Navigate to <strong className="text-white">CH 01 DOSSIERS</strong>. Search across batches using any student Name or Scholar Number (e.g. <span className="underline">24U010001</span>).
+                </p>
+              </div>
+              <Link
+                to="/search"
+                className="btn-secondary text-xs text-center tracking-wider py-1.5"
+              >
+                OPEN CH 01 SEARCH &gt;&gt;
+              </Link>
+            </div>
+
+            {/* Step 2 */}
+            <div className="border border-white/20 bg-white/5 p-5 flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono text-white/50 border-b border-white/10 pb-2">
+                  <span>PHASE 02</span>
+                  <span>LOCATE TRIGGER</span>
+                </div>
+                <div className="text-sm font-bold text-white tracking-wider">
+                  2. CLICK [+ PIN TAPE]
+                </div>
+                <p className="text-xs text-white/75 font-mono leading-relaxed">
+                  On the retrieved academic scorecard, look at the action bar in the top-right corner and click the retention button:
+                </p>
+                <div className="py-2 text-center">
+                  <span className="inline-block border border-white/60 bg-white/10 text-white text-xs px-3 py-1 font-mono tracking-widest select-none">
+                    [ + PIN TAPE ]
+                  </span>
+                </div>
+              </div>
+              <div className="text-[11px] text-white/40 font-mono text-center">
+                BUTTON LABELS SHIFT TO [ ★ PINNED ]
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="border border-white/20 bg-white/5 p-5 flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono text-white/50 border-b border-white/10 pb-2">
+                  <span>PHASE 03</span>
+                  <span>ZERO-LATENCY ACCESS</span>
+                </div>
+                <div className="text-sm font-bold text-white tracking-wider">
+                  3. PERSISTENT REPLAY
+                </div>
+                <p className="text-xs text-white/75 font-mono leading-relaxed">
+                  Pinned records are saved permanently to your account across devices. Inspect SPI progressions and academic standing without quota limits.
+                </p>
+              </div>
+              <div className="border border-white/20 bg-black/60 p-2 text-center text-xs font-mono text-white/60">
+                UNPIN OR ROTATE ANYTIME
+              </div>
+            </div>
           </div>
-          <p className="font-typewriter text-sm text-white/60 max-w-md mx-auto">
-            YOU HAVE NOT MARKED ANY DOSSIERS FOR RETENTION. GO TO <strong>CH 01 DOSSIERS</strong>, SEARCH ANY SCHOLAR, AND CLICK <strong>[ + PIN TAPE ]</strong> TO SAVE THEIR COMPLETE TELEMETRY HERE FOR INSTANT ACCESS.
-          </p>
+
+          {/* Action Footer Callout */}
+          <div className="border border-white/20 bg-black/70 p-4 flex flex-wrap items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center space-x-3 text-xs font-mono text-white/70">
+              <span className="text-amber-400 font-bold text-sm">⚡</span>
+              <span>
+                PRO-TIP: Use the pinned tapes channel to monitor special watchlist scholars or high-priority cohorts.
+              </span>
+            </div>
+            <Link
+              to="/search"
+              className="btn-primary text-xs glitch px-4 py-2"
+              data-text="LAUNCH CH 01 DOSSIERS >>"
+            >
+              LAUNCH CH 01 DOSSIERS &gt;&gt;
+            </Link>
+          </div>
         </div>
       )}
 

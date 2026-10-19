@@ -74,16 +74,20 @@ export default function Header({ user, onLogout, onOpenTour }) {
           <button
             type="button"
             onClick={onOpenTour}
-            className="hover:text-white transition-colors tracking-widest text-[11px] border border-white/20 px-2 py-0.5 bg-white/5"
+            className="hidden md:inline-block hover:text-white transition-colors tracking-widest text-[11px] border border-white/20 px-2 py-0.5 bg-white/5 glitch"
             title="Open interactive archive tour"
+            data-corruptible="true"
+            data-text="[ ? TOUR ]"
           >
             [ ? TOUR ]
           </button>
           <button
             type="button"
             onClick={handleDistortionToggle}
-            className="hover:text-white transition-colors tracking-widest text-[11px] border border-white/20 px-2 py-0.5 bg-white/5"
+            className="hidden md:inline-block hover:text-white transition-colors tracking-widest text-[11px] border border-white/20 px-2 py-0.5 bg-white/5 glitch"
             title="Cycle VHS scanline distortion mode"
+            data-corruptible="true"
+            data-text={`[VHS: ${distLevel.toUpperCase()}]`}
           >
             [VHS: {distLevel.toUpperCase()}]
           </button>
@@ -138,8 +142,11 @@ export default function Header({ user, onLogout, onOpenTour }) {
         {/* Mobile hamburger */}
         {user && (
           <button
-            className="md:hidden text-white/80 text-sm"
+            className="md:hidden text-white border-2 border-white/40 bg-white/10 px-3.5 py-1.5 text-lg font-bold tracking-widest hover:bg-white hover:text-black transition-colors glitch select-none"
+            data-corruptible="true"
+            data-text={mobileNav ? '[X]' : '[=]'}
             onClick={() => setMobileNav(!mobileNav)}
+            title="Toggle navigation channels"
           >
             {mobileNav ? '[X]' : '[=]'}
           </button>
