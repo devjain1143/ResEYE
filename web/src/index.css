@@ -1,0 +1,56 @@
+@import './styles/tokens.css';
+@import './styles/texture.css';
+@import './styles/glitch.css';
+@import './styles/glitch-eye.css';
+@import './styles/type.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--void);
+  color: var(--bone-80);
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 18px;
+  font-variant-emoji: text;
+  text-rendering: optimizeLegibility;
+}
+
+/* Terminal display */
+.font-terminal {
+  font-family: 'VT323', 'Courier New', monospace;
+  letter-spacing: 0.08em;
+  -webkit-font-smoothing: none;
+}
+
+.font-typewriter {
+  font-family: 'Special Elite', 'Courier New', monospace;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* No border-radius anywhere (spec rule 2) */
+* {
+  border-radius: 0 !important;
+}
+
+/* Block cursor caret */
+input, textarea {
+  caret-color: #fff;
+}

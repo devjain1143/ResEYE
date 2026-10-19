@@ -1,0 +1,92 @@
+/* === texture.css === */
+/* Global texture overlays: scanlines, vignette, noise, tracking bands */
+/* All are fixed, pointer-events:none, aria-hidden layers */
+
+.fx-scan {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  background: repeating-linear-gradient(0deg, var(--bone-07) 0 1px, transparent 1px 3px);
+}
+
+.fx-vig {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 91;
+  background: radial-gradient(ellipse at center, transparent 50%, rgb(0 0 0 / .85) 100%);
+  animation: breathe 9s ease-in-out infinite;
+}
+
+.fx-noise {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 92;
+  opacity: .11;
+  background: url(/fx/noise-256.png);
+  mix-blend-mode: screen;
+  animation: noise .9s steps(8) infinite;
+}
+
+.fx-bands {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 89;
+  overflow: hidden;
+}
+
+.fx-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: var(--bone-15);
+  transform: skewY(-0.5deg);
+  animation: band-drift 18s linear infinite;
+}
+.fx-band:nth-child(2) {
+  height: 12px;
+  animation-duration: 25s;
+  animation-delay: -7s;
+}
+.fx-band:nth-child(3) {
+  height: 5px;
+  animation-duration: 14s;
+  animation-delay: -3s;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .8; }
+}
+
+@keyframes noise {
+  0%   { background-position: 0 0; }
+  25%  { background-position: -64px 40px; }
+  50%  { background-position: 30px -80px; }
+  75%  { background-position: -20px 90px; }
+  100% { background-position: 0 0; }
+}
+
+@keyframes band-drift {
+  0%   { top: -20px; }
+  100% { top: calc(100vh + 20px); }
+}
+
+/* Reduced motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  .fx-vig { animation: none; }
+  .fx-noise { animation: none; }
+  .fx-band { animation: none; display: none; }
+}
+
+/* Distortion levels */
+[data-distortion="off"] .fx-vig,
+[data-distortion="off"] .fx-bands,
+[data-distortion="off"] .fx-noise { animation: none; }
+[data-distortion="off"] .fx-band { display: none; }
+
+[data-distortion="low"] .fx-bands { display: none; }

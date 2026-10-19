@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+web/node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+web/dist/
+dist/
+
+# Logs and runtime data
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Database & local student telemetry records
+data/students.db*
+data/*.xlsx
+data/ChatExport_*
+data/user_ai_usage.json
+data/provider_usage.json
+legacy/approved_user.txt
+legacy/whitelist.json
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,392 @@
+/* === glitch.css === */
+/* Section 8.1: Glitch text for headings, logo, labels only */
+
+.glitch,
+button,
+.btn-primary,
+.btn-secondary,
+.btn-destructive {
+  position: relative;
+  display: inline-block;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: transparent;
+  opacity: 0;
+}
+
+button::before,
+button::after,
+.btn-primary::before,
+.btn-primary::after,
+.btn-secondary::before,
+.btn-secondary::after,
+.btn-destructive::before,
+.btn-destructive::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: transparent;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  white-space: inherit;
+  overflow: hidden;
+}
+
+.glitch::before,
+button::before,
+.btn-secondary::before,
+.btn-destructive::before {
+  left: 0;
+  text-shadow: -3px 0 #fff;
+  color: inherit;
+}
+
+.glitch::after,
+button::after,
+.btn-secondary::after,
+.btn-destructive::after {
+  left: 0;
+  text-shadow: 3px 0 rgba(255, 255, 255, 0.75);
+  color: inherit;
+}
+
+/* Primary buttons with black text on white surface */
+.btn-primary::before {
+  left: 0;
+  text-shadow: -3px 0 #000;
+  color: #000;
+  background: #fff;
+}
+
+.btn-primary::after {
+  left: 0;
+  text-shadow: 3px 0 rgba(0, 0, 0, 0.75);
+  color: #000;
+  background: #fff;
+}
+
+.glitch:hover,
+.glitch.is-glitching,
+button:hover,
+button.is-glitching,
+.btn-primary:hover,
+.btn-primary.is-glitching,
+.btn-secondary:hover,
+.btn-secondary.is-glitching,
+.btn-destructive:hover,
+.btn-destructive.is-glitching {
+  animation: glitch-jitter .22s steps(1) 1;
+}
+
+.glitch:hover::before,
+.glitch.is-glitching::before,
+button:hover::before,
+button.is-glitching::before,
+.btn-primary:hover::before,
+.btn-primary.is-glitching::before,
+.btn-secondary:hover::before,
+.btn-secondary.is-glitching::before,
+.btn-destructive:hover::before,
+.btn-destructive.is-glitching::before {
+  opacity: 1;
+  animation: slice-a .24s steps(1) 1;
+}
+
+.glitch:hover::after,
+.glitch.is-glitching::after,
+button:hover::after,
+button.is-glitching::after,
+.btn-primary:hover::after,
+.btn-primary.is-glitching::after,
+.btn-secondary:hover::after,
+.btn-secondary.is-glitching::after,
+.btn-destructive:hover::after,
+.btn-destructive.is-glitching::after {
+  opacity: 1;
+  animation: slice-b .24s steps(1) 1;
+}
+
+@keyframes glitch-jitter {
+  0%   { transform: translate(0, 0); }
+  20%  { transform: translate(-2px, 1px); }
+  40%  { transform: translate(3px, -1px); }
+  60%  { transform: translate(-2px, -1px); }
+  80%  { transform: translate(2px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes slice-a {
+  0%   { clip-path: inset(15% 0 65% 0); transform: translate(-7px, -1px) skewX(-4deg); }
+  20%  { clip-path: inset(55% 0 15% 0); transform: translate(9px, 1px) skewX(6deg); }
+  40%  { clip-path: inset(30% 0 40% 0); transform: translate(-10px, 0) skewX(-3deg); }
+  60%  { clip-path: inset(75% 0 5% 0);  transform: translate(7px, -2px) skewX(4deg); }
+  80%  { clip-path: inset(5% 0 80% 0);  transform: translate(-5px, 2px) skewX(-5deg); }
+  100% { clip-path: inset(0 0 0 0);      transform: translate(0, 0) skewX(0deg); }
+}
+
+@keyframes slice-b {
+  0%   { clip-path: inset(50% 0 25% 0); transform: translate(8px, 1px) skewX(5deg); }
+  20%  { clip-path: inset(10% 0 75% 0); transform: translate(-9px, -1px) skewX(-5deg); }
+  40%  { clip-path: inset(65% 0 10% 0); transform: translate(11px, 2px) skewX(3deg); }
+  60%  { clip-path: inset(20% 0 55% 0); transform: translate(-6px, -1px) skewX(-6deg); }
+  80%  { clip-path: inset(80% 0 2% 0);  transform: translate(5px, 1px) skewX(2deg); }
+  100% { clip-path: inset(0 0 0 0);      transform: translate(0, 0) skewX(0deg); }
+}
+
+/* Section 8.3: Power flicker */
+@keyframes power-flicker {
+  0%, 100% { opacity: 1; }
+  20% { opacity: .93; }
+  40% { opacity: .97; }
+  60% { opacity: .94; }
+  80% { opacity: .98; }
+}
+
+.power-flicker {
+  animation: power-flicker .22s steps(5) 1;
+}
+
+/* Section 8.3: Vertical hold slip */
+@keyframes v-hold-slip {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(10px); }
+}
+
+/* Section 8.7: Tracking loading indicator */
+@keyframes tracking-sweep {
+  0%   { top: -20px; }
+  100% { top: 100%; }
+}
+
+.tracking-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: linear-gradient(180deg, transparent, var(--bone-15), transparent);
+  animation: tracking-sweep 1.2s linear infinite;
+  pointer-events: none;
+}
+
+/* Section 8.8: Selection and cursor */
+::selection {
+  background: #fff;
+  color: #000;
+}
+
+/* Section 9.1: Buttons */
+.btn-primary {
+  background: #fff;
+  color: #000;
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 24px;
+  letter-spacing: .1em;
+  padding: 10px 28px;
+  border: 0;
+  cursor: pointer;
+  clip-path: polygon(0 8%, 4% 0, 12% 6%, 100% 0, 98% 40%, 100% 62%, 96% 100%, 8% 94%, 0 100%, 3% 50%);
+  transition: transform 80ms;
+  min-height: 44px;
+}
+
+.btn-primary:hover {
+  transform: translateX(2px);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+.btn-primary:disabled {
+  opacity: .3;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: none;
+  color: var(--bone-80);
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 20px;
+  letter-spacing: .08em;
+  padding: 8px 16px;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  position: relative;
+}
+
+.btn-secondary::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: var(--bone-35);
+}
+
+.btn-secondary:hover {
+  color: var(--bone-100);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+
+.btn-destructive {
+  background: #fff;
+  color: #000;
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 22px;
+  letter-spacing: .1em;
+  padding: 10px 28px;
+  border: 0;
+  cursor: pointer;
+  clip-path: polygon(0 8%, 4% 0, 12% 6%, 100% 0, 98% 40%, 100% 62%, 96% 100%, 8% 94%, 0 100%, 3% 50%);
+  min-height: 44px;
+}
+
+/* Section 9.2: Inputs - underline only */
+.input-underline {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--bone-35);
+  color: var(--bone-100);
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 18px;
+  padding: 8px 0;
+  width: 100%;
+  outline: none;
+  caret-shape: block;
+}
+
+.input-underline:focus {
+  border-bottom-color: var(--bone-100);
+}
+
+.input-underline::placeholder {
+  color: var(--bone-35);
+  letter-spacing: .2em;
+}
+
+.input-underline.has-error {
+  border-bottom-style: dashed;
+  border-bottom-color: var(--bone-80);
+}
+
+/* Prevent browser autofill from rendering solid light/white boxes */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #000 inset !important;
+  -webkit-text-fill-color: var(--bone-100) !important;
+  box-shadow: 0 0 0 1000px #000 inset !important;
+  caret-color: #fff !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.input-label {
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 16px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--bone-60);
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* Section 9.5: Torn surfaces */
+.torn {
+  background: rgb(255 255 255 / .08);
+  clip-path: polygon(0 3%,6% 0,15% 4%,27% 1%,41% 5%,58% 0,73% 4%,88% 1%,100% 5%,
+                     99% 38%,100% 71%,97% 100%,84% 96%,66% 100%,49% 95%,31% 100%,14% 96%,2% 100%,0 70%,1% 34%);
+}
+
+.torn-v2 {
+  background: rgb(255 255 255 / .08);
+  clip-path: polygon(2% 0,18% 3%,35% 0,52% 4%,70% 1%,85% 5%,100% 2%,
+                     98% 35%,100% 68%,99% 100%,82% 97%,60% 100%,38% 96%,18% 100%,0 97%,1% 62%,0 30%);
+}
+
+.torn-v3 {
+  background: rgb(255 255 255 / .08);
+  clip-path: polygon(0 5%,8% 0,22% 6%,40% 2%,55% 5%,72% 0,90% 4%,100% 0,
+                     100% 40%,98% 70%,100% 100%,90% 95%,72% 100%,50% 94%,30% 100%,12% 95%,0 100%,2% 65%);
+}
+
+.torn-v4 {
+  background: rgb(255 255 255 / .08);
+  clip-path: polygon(3% 0,15% 5%,30% 1%,48% 4%,65% 0,80% 6%,95% 1%,100% 4%,
+                     99% 45%,100% 80%,96% 100%,78% 94%,55% 100%,35% 96%,15% 100%,0 95%,1% 55%,0 20%);
+}
+
+/* Section 9.7: Status chips */
+.status-active { color: var(--bone-80); }
+.status-pending { color: var(--bone-60); }
+.status-blocked {
+  background: var(--bone-100);
+  color: var(--void);
+  padding: 0 4px;
+}
+
+/* Reduced-motion safety */
+@media (prefers-reduced-motion: reduce) {
+  .glitch,
+  .glitch:hover,
+  .glitch.is-glitching,
+  button,
+  button:hover,
+  button.is-glitching,
+  .btn-primary,
+  .btn-secondary,
+  .btn-destructive { animation: none; transform: none; }
+  .glitch::before,
+  .glitch::after,
+  button::before,
+  button::after,
+  .btn-primary::before,
+  .btn-primary::after,
+  .btn-secondary::before,
+  .btn-secondary::after,
+  .btn-destructive::before,
+  .btn-destructive::after { display: none; }
+  .btn-primary:hover { transform: none; }
+  .power-flicker { animation: none; }
+}
+
+[data-distortion="off"] .glitch,
+[data-distortion="off"] .glitch:hover,
+[data-distortion="off"] .glitch.is-glitching,
+[data-distortion="off"] button,
+[data-distortion="off"] button:hover,
+[data-distortion="off"] button.is-glitching,
+[data-distortion="off"] .btn-primary,
+[data-distortion="off"] .btn-secondary,
+[data-distortion="off"] .btn-destructive { animation: none; transform: none; }
+[data-distortion="off"] .glitch::before,
+[data-distortion="off"] .glitch::after,
+[data-distortion="off"] button::before,
+[data-distortion="off"] button::after,
+[data-distortion="off"] .btn-primary::before,
+[data-distortion="off"] .btn-primary::after,
+[data-distortion="off"] .btn-secondary::before,
+[data-distortion="off"] .btn-secondary::after,
+[data-distortion="off"] .btn-destructive::before,
+[data-distortion="off"] .btn-destructive::after { display: none; }
+[data-distortion="off"] .tracking-band { display: none; }

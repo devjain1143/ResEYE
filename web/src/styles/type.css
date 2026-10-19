@@ -1,0 +1,66 @@
+/* === type.css === */
+/* Typography system per spec section 4 */
+
+/* Display / OSD / headings / labels / ASCII */
+.font-display,
+.font-terminal {
+  font-family: 'VT323', 'Courier New', monospace;
+  letter-spacing: .08em;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+/* Body / ledger lines / long text */
+.font-body,
+.font-typewriter {
+  font-family: 'Special Elite', 'Courier New', monospace;
+}
+
+/* Scale */
+.text-body-sm { font-size: 16px; }
+.text-body    { font-size: 18px; }
+.text-label   { font-size: 22px; }
+.text-section { font-size: 30px; }
+.text-page    { font-size: 46px; }
+.text-hero    { font-size: 74px; }
+.text-logo    { font-size: clamp(74px, 10vw, 122px); }
+
+/* Rules: labels/headings uppercase */
+.text-upper { text-transform: uppercase; }
+
+/* Pixelated rendering for bitmaps */
+.pixel { image-rendering: pixelated; }
+
+/* Ledger row style - typewriter text with dotted leaders */
+.ledger-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 18px;
+  line-height: 2;
+  color: var(--bone-80);
+}
+
+.ledger-row .leader {
+  flex: 1;
+  border-bottom: 1px dotted var(--bone-35);
+  margin: 0 4px;
+  min-width: 20px;
+}
+
+/* CPI glow per spec 9.4 */
+.cpi-glow {
+  text-shadow: 0 0 10px rgb(255 255 255 / .7);
+}
+
+/* Link hover per 8.8 */
+a:hover {
+  text-decoration-style: wavy;
+}
+
+/* Scratched underline animation */
+@keyframes scratch-draw {
+  from { stroke-dashoffset: 320; }
+  to   { stroke-dashoffset: 0; }
+}

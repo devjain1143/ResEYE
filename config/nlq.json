@@ -1,0 +1,18 @@
+{
+  "cacheTtlMs": 86400000,
+  "rateLimits": {
+    "daily": {
+      "windowMs": 86400000,
+      "max": 10
+    },
+    "burst": {
+      "windowMs": 60000,
+      "max": 5
+    }
+  },
+  "sweepingThreshold": {
+    "windowMs": 600000,
+    "maxDistinctBatches": 3,
+    "maxDistinctSemesters": 4
+  }
+}

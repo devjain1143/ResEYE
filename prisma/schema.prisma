@@ -1,0 +1,75 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["auth"]
+}
+
+enum Role {
+  USER
+  ADMIN
+  @@schema("auth")
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+  @@schema("auth")
+}
+
+model User {
+  id               String       @id @default(cuid())
+  username         String       @unique
+  email            String       @unique
+  passwordHash     String?
+  avatar           String?
+  isEmailVerified  Boolean      @default(false)
+  role             Role         @default(USER)
+  status           UserStatus   @default(ACTIVE)
+  blockedReason    String?
+  blockedAt        DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  sessions         Session[]
+  tokens           Token[]
+
+  @@index([status])
+  @@index([role])
+  @@schema("auth")
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent    String?
+  ip           String?
+  refreshToken String    @unique
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@schema("auth")
+}
+
+model Token {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId, type])
+  @@schema("auth")
+}

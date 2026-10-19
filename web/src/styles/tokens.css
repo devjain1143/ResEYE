@@ -1,0 +1,13 @@
+/* === tokens.css === */
+/* Color system: strictly monochrome, all grays are white at reduced alpha */
+:root {
+  --void: #000;
+  --bone: #fff;
+
+  --bone-100: rgb(255 255 255 / 1);
+  --bone-80:  rgb(255 255 255 / .80);
+  --bone-60:  rgb(255 255 255 / .60);
+  --bone-35:  rgb(255 255 255 / .35);
+  --bone-15:  rgb(255 255 255 / .15);
+  --bone-07:  rgb(255 255 255 / .07);
+}

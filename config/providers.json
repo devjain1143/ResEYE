@@ -1,0 +1,151 @@
+[
+  {
+    "name": "gemini",
+    "adapter": "gemini",
+    "model": "gemini-3.6-flash",
+    "apiKeyEnv": "GEMINI_API_KEY",
+    "limits": [
+      { "window": "minute", "max": 15 },
+      { "window": "day", "max": 1500 }
+    ]
+  },
+  {
+    "name": "gemini_2",
+    "adapter": "gemini",
+    "model": "gemini-3.6-flash",
+    "apiKeyEnv": "GEMINI_API_KEY_2",
+    "limits": [
+      { "window": "minute", "max": 15 },
+      { "window": "day", "max": 1500 }
+    ]
+  },
+  {
+    "name": "gemini_3",
+    "adapter": "gemini",
+    "model": "gemini-3.6-flash",
+    "apiKeyEnv": "GEMINI_API_KEY_3",
+    "limits": [
+      { "window": "minute", "max": 15 },
+      { "window": "day", "max": 1500 }
+    ]
+  },
+  {
+    "name": "gemini_4",
+    "adapter": "gemini",
+    "model": "gemini-3.6-flash",
+    "apiKeyEnv": "GEMINI_API_KEY_4",
+    "limits": [
+      { "window": "minute", "max": 15 },
+      { "window": "day", "max": 1500 }
+    ]
+  },
+  {
+    "name": "gemini_5",
+    "adapter": "gemini",
+    "model": "gemini-3.6-flash",
+    "apiKeyEnv": "GEMINI_API_KEY_5",
+    "limits": [
+      { "window": "minute", "max": 15 },
+      { "window": "day", "max": 1500 }
+    ]
+  },
+  {
+    "name": "gemini_6",
+    "adapter": "gemini",
+    "model": "gemini-3.6-flash",
+    "apiKeyEnv": "GEMINI_API_KEY_6",
+    "limits": [
+      { "window": "minute", "max": 15 },
+      { "window": "day", "max": 1500 }
+    ]
+  },
+  {
+    "name": "nvidia_nim",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "apiKeyEnv": "NVIDIA_NIM_API_KEY",
+    "extraBody": {
+      "max_tokens": 256,
+      "chat_template_kwargs": { "enable_thinking": false }
+    },
+    "limits": [
+      { "window": "minute", "max": 40 },
+      { "window": "day", "max": 1000 }
+    ]
+  },
+  {
+    "name": "nvidia_nim_2",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "apiKeyEnv": "NVIDIA_NIM_API_KEY_2",
+    "extraBody": {
+      "max_tokens": 256,
+      "chat_template_kwargs": { "enable_thinking": false }
+    },
+    "limits": [
+      { "window": "minute", "max": 40 },
+      { "window": "day", "max": 1000 }
+    ]
+  },
+  {
+    "name": "nvidia_nim_3",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://integrate.api.nvidia.com/v1/chat/completions",
+    "model": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "apiKeyEnv": "NVIDIA_NIM_API_KEY_3",
+    "extraBody": {
+      "max_tokens": 256,
+      "chat_template_kwargs": { "enable_thinking": false }
+    },
+    "limits": [
+      { "window": "minute", "max": 40 },
+      { "window": "day", "max": 1000 }
+    ]
+  },
+  {
+    "name": "groq",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://api.groq.com/openai/v1/chat/completions",
+    "model": "qwen/qwen3.8-27b",
+    "apiKeyEnv": "GROQ_API_KEY",
+    "limits": [
+      { "window": "minute", "max": 30 },
+      { "window": "day", "max": 1000 }
+    ]
+  },
+  {
+    "name": "mistral",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://api.mistral.ai/v1/chat/completions",
+    "model": "open-mistral-7b",
+    "apiKeyEnv": "MISTRAL_API_KEY",
+    "limits": [
+      { "window": "minute", "max": 30 },
+      { "window": "day", "max": 1000 }
+    ]
+  },
+  {
+    "name": "openrouter",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "nvidia/nemotron-3.5-lightning:free",
+    "apiKeyEnv": "OPENROUTER_API_KEY",
+    "limits": [
+      { "window": "minute", "max": 20 },
+      { "window": "day", "max": 200 }
+    ]
+  },
+  {
+    "name": "cerebras",
+    "adapter": "openaiCompatible",
+    "endpoint": "https://api.cerebras.ai/v1/chat/completions",
+    "model": "qwen-3.8-27b",
+    "apiKeyEnv": "CEREBRAS_API_KEY",
+    "limits": [
+      { "window": "minute", "max": 30 },
+      { "window": "day", "max": 1000 }
+    ]
+  }
+]
