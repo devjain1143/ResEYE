@@ -79,22 +79,7 @@ const TOUR_STEPS_BASE = [
   }
 ];
 
-const ADMIN_STEP = {
-  channel: 'CH 03',
-  badge: 'ADMINISTRATOR COMMAND CONTROL ROOM',
-  title: 'CONTROL ROOM SUITE (ADMIN CLEARANCE)',
-  tagline: 'Central surveillance oversight, telemetry logs, and security controls.',
-  summary:
-    'As an administrator, you possess elevated clearance to monitor the entire ResEYE infrastructure.',
-  bullets: [
-    'Security Alerts: Real-time triage of batch sweeps, sequential enumerations, and captcha anomalies.',
-    'User Management: Authorize pending registrations, promote operators, or purge revoked credentials.',
-    'AI Feedback Triage: Step through unrated natural language answers to correct model logic.',
-    'System Broadcasts: Post critical announcements and export academic data dumps on demand.'
-  ],
-  hint: 'PRO-TIP: Access CH 03 CONTROL ROOM from the navigation bar anytime.'
-};
-export default function FeatureTour({ isOpen, onClose, user }) {
+export default function FeatureTour({ isOpen, onClose }) {
   const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
@@ -103,13 +88,7 @@ export default function FeatureTour({ isOpen, onClose, user }) {
     }
   }, [isOpen]);
 
-  const steps = React.useMemo(() => {
-    if (user?.role === 'ADMIN') {
-      return [...TOUR_STEPS_BASE, ADMIN_STEP];
-    }
-    return TOUR_STEPS_BASE;
-  }, [user?.role]);
-
+  const steps = TOUR_STEPS_BASE;
   const totalSteps = steps.length;
   const step = steps[currentStep] || steps[0];
 

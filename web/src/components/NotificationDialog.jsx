@@ -37,7 +37,7 @@ export default function NotificationDialog() {
       <div className="w-full max-w-lg border-2 border-white bg-black p-6 font-terminal text-white clip-torn crt-screen">
         <div className="mb-4 flex items-center justify-between border-b border-white pb-2">
           <span className="bg-white text-black px-2 py-0.5 text-sm font-bold">[ SECURITY WARNING ]</span>
-          <span className="text-xs text-white/50">DIRECTIVE FROM ADMINISTRATION</span>
+          <span className="text-xs text-white/50">SYSTEM SECURITY DIRECTIVE</span>
         </div>
 
         <div className="my-6 font-typewriter text-sm leading-relaxed text-white/90 whitespace-pre-wrap border-l-2 border-white/60 pl-4">

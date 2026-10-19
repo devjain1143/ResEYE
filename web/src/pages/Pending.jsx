@@ -68,7 +68,7 @@ export default function Pending({ onLogout }) {
         YOUR TAPE IS WAITING TO BE WATCHED.
       </p>
       <p className="font-typewriter text-sm text-center max-w-md mb-6" style={{ color: 'var(--bone-60)' }}>
-        AN ADMINISTRATOR WILL OPEN THE DOOR.
+        CLEARANCE TELEMETRY AWAITING AUTHORIZATION.
       </p>
 
       {/* Status block */}
