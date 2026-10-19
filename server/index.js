@@ -59,6 +59,22 @@ app.use('/api/me', meRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', adminRouter);
 
+// Google Search Console verification files
+app.get('/google:id.html', (req, res, next) => {
+  const fileName = `google${req.params.id}.html`;
+  const possiblePaths = [
+    path.resolve(__dirname, `../${fileName}`),
+    path.resolve(__dirname, `../web/public/${fileName}`),
+    path.resolve(__dirname, `../web/dist/${fileName}`)
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return res.sendFile(p);
+    }
+  }
+  next();
+});
+
 // Serve web frontend build if present
 const webDistPath = path.resolve(__dirname, '../web/dist');
 if (fs.existsSync(webDistPath)) {
