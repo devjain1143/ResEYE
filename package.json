@@ -7,12 +7,13 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "import": "node scripts/import_excel.js",
     "test:ai": "node scripts/test_prompt.js",
-    "build": "npm --prefix web run build"
+    "build": "npm --prefix web install && npm --prefix web run build"
   },
   "dependencies": {
     "@getbrevo/brevo": "^2.2.0",
