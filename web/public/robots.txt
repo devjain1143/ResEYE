@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Allow: /search
+Disallow: /api/
+Disallow: /admin/
+Disallow: /pending
+Disallow: /pinned
+Disallow: /history
+
+Sitemap: https://reseye.onrender.com/sitemap.xml

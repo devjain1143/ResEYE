@@ -59,6 +59,29 @@ app.use('/api/me', meRouter);
 app.use('/api/announcements', announcementsRouter);
 app.use('/api/admin', adminRouter);
 
+// SEO & Crawl Discovery: robots.txt & sitemap.xml
+app.get('/robots.txt', (req, res) => {
+  const possiblePaths = [
+    path.resolve(__dirname, '../web/public/robots.txt'),
+    path.resolve(__dirname, '../web/dist/robots.txt')
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) return res.type('text/plain').sendFile(p);
+  }
+  res.type('text/plain').send('User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nSitemap: https://reseye.onrender.com/sitemap.xml\n');
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const possiblePaths = [
+    path.resolve(__dirname, '../web/public/sitemap.xml'),
+    path.resolve(__dirname, '../web/dist/sitemap.xml')
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) return res.type('application/xml').sendFile(p);
+  }
+  res.status(404).end();
+});
+
 // Google Search Console verification files
 app.get('/google:id.html', (req, res, next) => {
   const fileName = `google${req.params.id}.html`;
