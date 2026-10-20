@@ -2,8 +2,15 @@ import { Router } from 'express';
 import prisma from '../../kit/lib/prisma.js';
 import { getDb } from '../../core/db.js';
 import { alertService } from '../../services/alertService.js';
+import { authenticate } from '../../middleware/authenticate.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import { originCheck } from '../../middleware/originCheck.js';
 
 const router = Router();
+
+router.use(originCheck);
+router.use(authenticate);
+router.use(requireRole('ADMIN'));
 
 router.get('/', async (req, res, next) => {
   try {

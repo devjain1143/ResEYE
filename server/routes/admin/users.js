@@ -2,8 +2,15 @@ import { Router } from 'express';
 import prisma from '../../kit/lib/prisma.js';
 import { audit } from '../../services/auditService.js';
 import { notificationService } from '../../services/notificationService.js';
+import { authenticate } from '../../middleware/authenticate.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import { originCheck } from '../../middleware/originCheck.js';
 
 const router = Router();
+
+router.use(originCheck);
+router.use(authenticate);
+router.use(requireRole('ADMIN'));
 
 router.get('/', async (req, res, next) => {
   try {
@@ -63,6 +70,14 @@ router.patch('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status, role, blockedReason } = req.body;
+
+    if (status !== undefined && !['ACTIVE', 'PENDING', 'BLOCKED'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid user status. Allowed: ACTIVE, PENDING, BLOCKED.' });
+    }
+
+    if (role !== undefined && !['USER', 'ADMIN'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid user role. Allowed: USER, ADMIN.' });
+    }
 
     const targetUser = await prisma.user.findUnique({ where: { id } });
     if (!targetUser) {

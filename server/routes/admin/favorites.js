@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import { getDb } from '../../core/db.js';
+import { authenticate } from '../../middleware/authenticate.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import { originCheck } from '../../middleware/originCheck.js';
 
 const router = Router();
+
+router.use(originCheck);
+router.use(authenticate);
+router.use(requireRole('ADMIN'));
 
 // GET /api/admin/favorites - Full facility pin surveillance & intercept records
 router.get('/', async (req, res, next) => {

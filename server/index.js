@@ -49,6 +49,14 @@ app.use(express.json({ limit: '50kb' }));
 app.use(cookieParser());
 app.use(passport.initialize());
 
+// Enforce no-cache and no-store on sensitive API responses
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // API Routes
 app.use('/api/auth', authRouter);
 app.use('/api/human', humanRouter);

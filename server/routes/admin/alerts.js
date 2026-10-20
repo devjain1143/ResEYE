@@ -4,8 +4,15 @@ import { audit } from '../../services/auditService.js';
 import { notificationService } from '../../services/notificationService.js';
 import prisma from '../../kit/lib/prisma.js';
 import { getDb } from '../../core/db.js';
+import { authenticate } from '../../middleware/authenticate.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import { originCheck } from '../../middleware/originCheck.js';
 
 const router = Router();
+
+router.use(originCheck);
+router.use(authenticate);
+router.use(requireRole('ADMIN'));
 
 router.get('/unread-count', async (req, res, next) => {
   try {

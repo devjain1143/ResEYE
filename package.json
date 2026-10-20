@@ -12,6 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "import": "node scripts/import_excel.js",
+    "test": "node scripts/security_test.js",
+    "test:security": "node scripts/security_test.js",
     "test:ai": "node scripts/test_prompt.js",
     "build": "npm install && npm --prefix web install && npm --prefix web run build"
   },

@@ -227,7 +227,8 @@ export async function getTopScorer(filterInput, semester = null, metric = 'cpi',
   const fetchLimit = Math.max(1, Math.min(5, parseInt(limit, 10) || 1));
 
   const sql = `
-    SELECT * FROM students 
+    SELECT id, scholar_no, name, degree, specialization, cpi_final, ${targetCol} as score
+    FROM students 
     WHERE ${filter.conditionSql} AND ${targetCol} IS NOT NULL 
     ORDER BY ${targetCol} ${orderDir} 
     LIMIT $${filter.params.length + 1}

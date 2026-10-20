@@ -145,10 +145,13 @@ export function reloadRegistrationData(buffer = null) {
 
 export function getRegistrationMetadata() {
   const cache = loadRegistrationData();
+  const reloadTime = lastReloadTime || new Date();
   return {
     rowCount: cache.size,
-    lastReloadTime: lastReloadTime || new Date(),
-    filePath: fs.existsSync(REGISTRATION_FILE) ? REGISTRATION_FILE : './registration_data.xlsx'
+    lastReloadTime: reloadTime,
+    lastLoadedAt: reloadTime,
+    fileName: path.basename(REGISTRATION_FILE),
+    sourceFile: path.basename(REGISTRATION_FILE)
   };
 }
 

@@ -16,21 +16,22 @@ import Search from './pages/Search';
 import History from './pages/History';
 import PinnedTapes from './pages/PinnedTapes';
 
-import AdminLayout from './pages/admin/AdminLayout';
-import Dashboard from './pages/admin/Dashboard';
-import Users from './pages/admin/Users';
-import SpecialScholars from './pages/admin/SpecialScholars';
-import PinnedMonitors from './pages/admin/PinnedMonitors';
-import Alerts from './pages/admin/Alerts';
-import SearchHistory from './pages/admin/SearchHistory';
-import AiHistory from './pages/admin/AiHistory';
-import Feedback from './pages/admin/Feedback';
-import Announcements from './pages/admin/Announcements';
-import Registration from './pages/admin/Registration';
-import Export from './pages/admin/Export';
-import NlqDebug from './pages/admin/NlqDebug';
-import Settings from './pages/admin/Settings';
-import AuditLog from './pages/admin/AuditLog';
+// Administrator Command Suite - Lazy-loaded chunks (isolated from public bundle)
+const AdminLayout = React.lazy(() => import('./pages/admin/AdminLayout'));
+const Dashboard = React.lazy(() => import('./pages/admin/Dashboard'));
+const Users = React.lazy(() => import('./pages/admin/Users'));
+const SpecialScholars = React.lazy(() => import('./pages/admin/SpecialScholars'));
+const PinnedMonitors = React.lazy(() => import('./pages/admin/PinnedMonitors'));
+const Alerts = React.lazy(() => import('./pages/admin/Alerts'));
+const SearchHistory = React.lazy(() => import('./pages/admin/SearchHistory'));
+const AiHistory = React.lazy(() => import('./pages/admin/AiHistory'));
+const Feedback = React.lazy(() => import('./pages/admin/Feedback'));
+const Announcements = React.lazy(() => import('./pages/admin/Announcements'));
+const Registration = React.lazy(() => import('./pages/admin/Registration'));
+const Export = React.lazy(() => import('./pages/admin/Export'));
+const NlqDebug = React.lazy(() => import('./pages/admin/NlqDebug'));
+const Settings = React.lazy(() => import('./pages/admin/Settings'));
+const AuditLog = React.lazy(() => import('./pages/admin/AuditLog'));
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -231,7 +232,15 @@ export default function App() {
               ) : user.role !== 'ADMIN' ? (
                 <Navigate to="/search" replace />
               ) : (
-                <AdminLayout user={user} />
+                <React.Suspense
+                  fallback={
+                    <div className="p-8 text-center font-terminal text-sm text-white/50 tracking-widest animate-pulse">
+                      [ DECRYPTING PRIVILEGED INTERFACE... ]
+                    </div>
+                  }
+                >
+                  <AdminLayout user={user} />
+                </React.Suspense>
               )
             }
           >

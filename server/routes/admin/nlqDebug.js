@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import { handleDebugIntent } from '../../nlq/index.js';
 import { audit } from '../../services/auditService.js';
+import { authenticate } from '../../middleware/authenticate.js';
+import { requireRole } from '../../middleware/requireRole.js';
+import { originCheck } from '../../middleware/originCheck.js';
 
 const router = Router();
+
+router.use(originCheck);
+router.use(authenticate);
+router.use(requireRole('ADMIN'));
 
 router.post('/', async (req, res, next) => {
   try {

@@ -10,7 +10,7 @@ export async function authenticate(req, res, next) {
 
   let payload;
   try {
-    payload = jwt.verify(token, JWT_ACCESS_SECRET);
+    payload = jwt.verify(token, JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ success: false, message: 'Unauthorized.' });
   }
@@ -70,7 +70,7 @@ export async function authenticateAllowPending(req, res, next) {
 
   let payload;
   try {
-    payload = jwt.verify(token, JWT_ACCESS_SECRET);
+    payload = jwt.verify(token, JWT_ACCESS_SECRET, { algorithms: ['HS256'] });
   } catch {
     return res.status(401).json({ success: false, message: 'Unauthorized.' });
   }
