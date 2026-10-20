@@ -62,12 +62,6 @@ export default function Register() {
         });
       }
 
-      if (!activeToken) {
-        setError('FAULT: COMPLETE THE SECURITY VERIFICATION CHECK BELOW.');
-        setLoading(false);
-        return;
-      }
-
       const res = await api('/auth/register', {
         method: 'POST',
         body: { username, email, password, turnstileToken: activeToken },
@@ -183,30 +177,10 @@ export default function Register() {
               />
             </div>
 
-            <div className="flex justify-center my-3 min-h-[65px]">
-              <Turnstile
-                ref={widgetRef}
-                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-                options={{ action: 'register', theme: 'dark' }}
-                onSuccess={(t) => {
-                  setToken(t);
-                  if (tokenResolverRef.current) tokenResolverRef.current(t);
-                }}
-                onError={(err) => {
-                  console.error('[Turnstile] Challenge error:', err);
-                  setError(`FAULT: SECURITY CHECK ERROR (${err}). CHECK DOMAIN PERMISSIONS.`);
-                }}
-                onExpire={() => {
-                  setToken(null);
-                  widgetRef.current?.reset();
-                }}
-              />
-            </div>
-
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full"
+              className="btn-primary w-full mt-6"
             >
               {loading ? 'TRANSMITTING...' : 'ENROLL CREDENTIALS >>'}
             </button>
@@ -259,6 +233,32 @@ export default function Register() {
             </div>
           </div>
         )}
+
+        {/* Hidden Background Turnstile */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            left: '-9999px',
+            top: '0px',
+            width: '300px',
+            height: '65px',
+            opacity: 0,
+            pointerEvents: 'none',
+            zIndex: -100,
+          }}
+        >
+          <Turnstile
+            ref={widgetRef}
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
+            options={{ action: 'register', theme: 'dark' }}
+            onSuccess={(t) => {
+              setToken(t);
+              if (tokenResolverRef.current) tokenResolverRef.current(t);
+            }}
+            onExpire={() => setToken(null)}
+          />
+        </div>
 
         <div className="mt-8 font-terminal text-xs" style={{ color: 'var(--bone-35)' }}>
           <Link to="/login" className="btn-secondary text-xs" style={{ padding: '2px 0' }}>
