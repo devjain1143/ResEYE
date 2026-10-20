@@ -326,7 +326,7 @@ export default function Login({ onAuthSuccess }) {
           >
             <Turnstile
               ref={widgetRef}
-              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'}
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
               options={{ action: 'login', theme: 'dark' }}
               onSuccess={(t) => {
                 setToken(t);
@@ -337,7 +337,7 @@ export default function Login({ onAuthSuccess }) {
             {googleEnabled && (
               <Turnstile
                 ref={googleWidgetRef}
-                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
                 options={{ action: 'google', theme: 'dark' }}
                 onSuccess={(t) => {
                   setGoogleToken(t);

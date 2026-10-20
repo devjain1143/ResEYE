@@ -2,11 +2,13 @@ const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
 export function requireTurnstile(expectedAction) {
   return async (req, res, next) => {
-    const secret = process.env.TURNSTILE_SECRET_KEY;
+    const rawSecret = process.env.TURNSTILE_SECRET_KEY || '';
+    const secret = rawSecret.replace(/^["']|["']$/g, '').trim();
 
     // Development / test bypass if secret is not set, test key, or test token passed
     const token = req.body?.turnstileToken || req.headers['x-turnstile-token'];
     if (
+      process.env.BYPASS_TURNSTILE === 'true' ||
       !secret ||
       secret === 'dummy' ||
       secret === 'test' ||
@@ -40,9 +42,16 @@ export function requireTurnstile(expectedAction) {
 
       const data = await r.json();
       const hostOk = !process.env.TURNSTILE_EXPECTED_HOSTNAME || data.hostname === process.env.TURNSTILE_EXPECTED_HOSTNAME;
-      const actionOk = !expectedAction || data.action === expectedAction;
+      const actionOk = !expectedAction || !data.action || data.action === expectedAction;
 
       if (!data.success || !hostOk || !actionOk) {
+        if (!data.success) {
+          console.warn('[Turnstile] Cloudflare verification failed:', data['error-codes'] || data);
+        } else if (!hostOk) {
+          console.warn('[Turnstile] Hostname mismatch:', data.hostname, 'expected:', process.env.TURNSTILE_EXPECTED_HOSTNAME);
+        } else if (!actionOk) {
+          console.warn('[Turnstile] Action mismatch:', data.action, 'expected:', expectedAction);
+        }
         return res.status(403).json({
           success: false,
           code: 'CAPTCHA_FAILED',
@@ -51,7 +60,8 @@ export function requireTurnstile(expectedAction) {
       }
 
       return next();
-    } catch {
+    } catch (err) {
+      console.error('[Turnstile] Verification error or timeout:', err.message);
       // Fail closed
       return res.status(503).json({
         success: false,

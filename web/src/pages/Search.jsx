@@ -652,7 +652,7 @@ export default function Search({ user }) {
         {captchaActive && !captchaVerified && (
           <Turnstile
             ref={turnstileRef}
-            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'}
+            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
             options={{ action: 'search', theme: 'dark' }}
             onSuccess={handleTurnstileSuccess}
             onError={() => turnstileRef.current?.reset()}
