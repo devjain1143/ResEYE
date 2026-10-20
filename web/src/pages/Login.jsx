@@ -112,6 +112,13 @@ export default function Login({ onAuthSuccess }) {
         });
       }
 
+      if (!activeToken) {
+        setError('FAULT: COMPLETE THE SECURITY VERIFICATION CHECK BELOW.');
+        setStare(true);
+        setLoading(false);
+        return;
+      }
+
       const res = await api('/auth/login', {
         method: 'POST',
         body: { identifier, password, turnstileToken: activeToken },
@@ -298,11 +305,31 @@ export default function Login({ onAuthSuccess }) {
               />
             </div>
 
+            <div className="flex justify-center my-3 min-h-[65px]">
+              <Turnstile
+                ref={widgetRef}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
+                options={{ action: 'login', theme: 'dark' }}
+                onSuccess={(t) => {
+                  setToken(t);
+                  if (tokenResolverRef.current) tokenResolverRef.current(t);
+                }}
+                onError={(err) => {
+                  console.error('[Turnstile] Challenge error:', err);
+                  setError(`FAULT: SECURITY CHECK ERROR (${err}). CHECK DOMAIN PERMISSIONS.`);
+                }}
+                onExpire={() => {
+                  setToken(null);
+                  widgetRef.current?.reset();
+                }}
+              />
+            </div>
+
             <button
               type={needsRegistration ? 'button' : 'submit'}
               onClick={needsRegistration ? () => navigate(`/register?email=${encodeURIComponent(identifier.trim())}`) : undefined}
               disabled={loading}
-              className="btn-primary w-full mt-4 glitch"
+              className="btn-primary w-full glitch"
               data-corruptible="true"
               data-text={loading ? 'AUTHENTICATING...' : (needsRegistration ? 'REGISTER >>' : 'SIGN IN >>')}
             >
@@ -310,31 +337,20 @@ export default function Login({ onAuthSuccess }) {
             </button>
           </form>
 
-          {/* Hidden Background Turnstiles */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'fixed',
-              left: '-9999px',
-              top: '0px',
-              width: '300px',
-              height: '65px',
-              opacity: 0,
-              pointerEvents: 'none',
-              zIndex: -100,
-            }}
-          >
-            <Turnstile
-              ref={widgetRef}
-              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-              options={{ action: 'login', theme: 'dark' }}
-              onSuccess={(t) => {
-                setToken(t);
-                if (tokenResolverRef.current) tokenResolverRef.current(t);
+          {googleEnabled && (
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                left: '-9999px',
+                top: '0px',
+                width: '300px',
+                height: '65px',
+                opacity: 0,
+                pointerEvents: 'none',
+                zIndex: -100,
               }}
-              onExpire={() => setToken(null)}
-            />
-            {googleEnabled && (
+            >
               <Turnstile
                 ref={googleWidgetRef}
                 siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
@@ -345,8 +361,8 @@ export default function Login({ onAuthSuccess }) {
                 }}
                 onExpire={() => setGoogleToken(null)}
               />
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Footer links */}
           <div className="mt-8 flex justify-between items-center font-terminal text-xs" style={{ color: 'var(--bone-35)' }}>
