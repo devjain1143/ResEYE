@@ -1,3 +1,7 @@
+import { DecryptionError } from '../crypto/index.js';
+import { alertService } from '../services/alertService.js';
+import { redactString } from './logger.js';
+
 export function notFound(req, res, next) {
   res.status(404).json({
     success: false,
@@ -6,18 +10,30 @@ export function notFound(req, res, next) {
 }
 
 export function errorHandler(err, req, res, next) {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || 'Internal server anomaly.';
-  const code = err.code || (status === 500 ? 'INTERNAL_ERROR' : undefined);
+  const isCryptoError = err instanceof DecryptionError || err.name === 'DecryptionError';
+  const status = isCryptoError ? 500 : (err.status || err.statusCode || 500);
+
+  if (isCryptoError) {
+    alertService.create('CRYPTO_FAILURE', req.user?.id || null, {
+      endpoint: req.originalUrl,
+      reason: 'Cryptographic envelope verification or tag mismatch'
+    }).catch(() => {});
+  }
 
   if (status >= 500) {
-    console.error('[Server Error]', err);
+    console.error('[Server Anomaly]', redactString(err.message || ''));
+  }
+
+  // Sanitized message: never expose internal SQL, crypto keys, or stacks
+  const isProd = process.env.NODE_ENV === 'production';
+  let message = err.message || 'Internal server anomaly.';
+  if (status >= 500 && (isProd || isCryptoError || /sql|syntax|prisma|column|table|relation/i.test(message))) {
+    message = 'Internal server anomaly.';
   }
 
   res.status(status).json({
     success: false,
     message,
-    ...(code && { code }),
-    ...(process.env.NODE_ENV !== 'production' && status >= 500 && { stack: err.stack })
+    ...(status >= 500 && { code: 'INTERNAL_ERROR' })
   });
 }

@@ -168,7 +168,7 @@ export default function FeatureTour({ isOpen, onClose }) {
               className="text-white/40 hover:text-white transition-colors"
               title="Close orientation (Esc)"
             >
-              [✕]
+              [X]
             </button>
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function FeatureTour({ isOpen, onClose }) {
 
           {/* Hint Footer Box */}
           <div className="border border-white/20 bg-black/60 p-2.5 text-[11px] font-mono text-white/60 flex items-center space-x-2">
-            <span className="text-amber-400 font-bold select-none">⚡</span>
+            <span className="text-amber-400 font-bold select-none">[*]</span>
             <span>{step.hint}</span>
           </div>
         </div>

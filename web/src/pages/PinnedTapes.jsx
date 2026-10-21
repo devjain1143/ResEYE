@@ -185,7 +185,7 @@ export default function PinnedTapes({ user }) {
                 </div>
               </div>
               <div className="text-[11px] text-white/40 font-mono text-center">
-                BUTTON LABELS SHIFT TO [ ★ PINNED ]
+                BUTTON LABELS SHIFT TO [ * PINNED ]
               </div>
             </div>
 
@@ -212,7 +212,7 @@ export default function PinnedTapes({ user }) {
           {/* Action Footer Callout */}
           <div className="border border-white/20 bg-black/70 p-4 flex flex-wrap items-center justify-between gap-4 relative z-10">
             <div className="flex items-center space-x-3 text-xs font-mono text-white/70">
-              <span className="text-amber-400 font-bold text-sm">⚡</span>
+              <span className="text-amber-400 font-bold text-sm">[*]</span>
               <span>
                 PRO-TIP: Use the pinned tapes channel to monitor special watchlist scholars or high-priority cohorts.
               </span>

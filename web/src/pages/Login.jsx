@@ -19,7 +19,6 @@ export default function Login({ onAuthSuccess }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [stare, setStare] = useState(false);
-  const [needsRegistration, setNeedsRegistration] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -32,43 +31,6 @@ export default function Login({ onAuthSuccess }) {
   const googleTokenResolverRef = useRef(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
-  const checkEmailStatus = async (val) => {
-    const trimmed = (val || '').trim();
-    if (!trimmed.includes('@')) {
-      setNeedsRegistration(false);
-      return;
-    }
-    if (!trimmed.toLowerCase().endsWith('@iiitbhopal.ac.in')) {
-      return;
-    }
-    try {
-      const res = await api(`/auth/check-email?email=${encodeURIComponent(trimmed)}`);
-      if (res && res.isEmail && res.validDomain && !res.exists) {
-        setNeedsRegistration(true);
-        setError('ACCOUNT NOT FOUND FOR THIS EMAIL. PLEASE REGISTER.');
-        setStare(true);
-      } else if (res && res.exists) {
-        setNeedsRegistration(false);
-        setError((prev) => (prev.includes('ACCOUNT NOT FOUND') ? '' : prev));
-      }
-    } catch {
-      // Ignore background check errors
-    }
-  };
-
-  useEffect(() => {
-    const trimmed = identifier.trim().toLowerCase();
-    if (trimmed.includes('@') && trimmed.endsWith('@iiitbhopal.ac.in')) {
-      const timer = setTimeout(() => {
-        checkEmailStatus(trimmed);
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
-      setNeedsRegistration(false);
-      setError((prev) => (prev.includes('ACCOUNT NOT FOUND') ? '' : prev));
-    }
-  }, [identifier]);
 
   useEffect(() => {
     const errParam = searchParams.get('error');
@@ -89,10 +51,6 @@ export default function Login({ onAuthSuccess }) {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (needsRegistration) {
-      navigate(`/register?email=${encodeURIComponent(identifier.trim())}`);
-      return;
-    }
     setError('');
     setStare(false);
 
@@ -121,14 +79,7 @@ export default function Login({ onAuthSuccess }) {
       setAccessToken(res.accessToken);
       onAuthSuccess(res.user);
     } catch (err) {
-      if (err.code === 'USER_NOT_FOUND' || err.status === 404 || (err.message && err.message.toLowerCase().includes('not found'))) {
-        setNeedsRegistration(true);
-        setError('ACCOUNT NOT FOUND FOR THIS EMAIL. PLEASE REGISTER.');
-      } else if (err.code === 'EMAIL_NOT_VERIFIED' || (err.message && err.message.toLowerCase().includes('not verified'))) {
-        setError('FAULT: EMAIL NOT VERIFIED. PLEASE CLICK THE LINK SENT TO YOUR INBOX (CHECK JUNK / SPAM FOLDER).');
-      } else {
-        setError(`FAULT: ${err.message || 'CREDENTIALS NOT RECOGNIZED.'}`);
-      }
+      setError(`FAULT: ${err.message || 'EMAIL OR PASSWORD IS INCORRECT.'}`);
       setStare(true);
       widgetRef.current?.reset();
       setToken(null);
@@ -276,7 +227,6 @@ export default function Login({ onAuthSuccess }) {
                 required
                 value={identifier}
                 onChange={(e) => { setIdentifier(e.target.value); setStare(false); }}
-                onBlur={() => checkEmailStatus(identifier)}
                 placeholder="________"
                 className="input-underline"
                 style={{ fontSize: '20px' }}
@@ -288,7 +238,7 @@ export default function Login({ onAuthSuccess }) {
               <label className="input-label">PASSWORD</label>
               <input
                 type="password"
-                required={!needsRegistration}
+                required
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setStare(false); }}
                 placeholder="________"
@@ -299,14 +249,13 @@ export default function Login({ onAuthSuccess }) {
             </div>
 
             <button
-              type={needsRegistration ? 'button' : 'submit'}
-              onClick={needsRegistration ? () => navigate(`/register?email=${encodeURIComponent(identifier.trim())}`) : undefined}
+              type="submit"
               disabled={loading}
               className="btn-primary w-full mt-4 glitch"
               data-corruptible="true"
-              data-text={loading ? 'AUTHENTICATING...' : (needsRegistration ? 'REGISTER >>' : 'SIGN IN >>')}
+              data-text={loading ? 'AUTHENTICATING...' : 'SIGN IN >>'}
             >
-              {loading ? 'AUTHENTICATING...' : (needsRegistration ? 'REGISTER >>' : 'SIGN IN >>')}
+              {loading ? 'AUTHENTICATING...' : 'SIGN IN >>'}
             </button>
           </form>
 
@@ -373,7 +322,7 @@ export default function Login({ onAuthSuccess }) {
                   onClick={() => setShowForgot(false)}
                   className="text-white/40 hover:text-white"
                 >
-                  [✕]
+                  [X]
                 </button>
               </div>
 

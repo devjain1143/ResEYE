@@ -6,10 +6,14 @@ import { normalizeInstitutionEmail } from '../config/domain.js';
 import { settingsService } from '../../services/settingsService.js';
 import { emailService } from '../../services/emailService.js';
 import { firebaseAuthService } from '../../services/firebaseAuthService.js';
+import { hashToken } from '../../crypto/index.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'reseye-dev-access-secret-389148';
 const JWT_ACCESS_EXPIRES_IN = process.env.JWT_ACCESS_EXPIRES_IN || '15m';
 const REFRESH_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+// Fixed bcrypt hash with cost 12 for constant-time comparison when account is missing
+const DUMMY_HASH = '$2a$12$e80MvQkK1qQzX75H6N1sO.99L0sF9EwE0/H.0h2F377s7X7X7X7X.';
 
 function getAdminEmails() {
   const envAdmins = process.env.ADMIN_EMAILS || '';
@@ -33,52 +37,42 @@ export const authService = {
     }
 
     const existingEmail = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (existingEmail && existingEmail.isEmailVerified) {
-      const err = new Error('An account with this email already exists.');
-      err.status = 400;
-      throw err;
-    }
+    const existingUsername = username ? await prisma.user.findUnique({ where: { username } }) : null;
 
-    const existingUsername = await prisma.user.findUnique({ where: { username } });
-    if (existingUsername && (!existingEmail || existingUsername.id !== existingEmail.id)) {
-      const err = new Error('Username is already taken.');
-      err.status = 400;
-      throw err;
+    if (existingEmail || (existingUsername && (!existingEmail || existingUsername.id !== existingEmail.id))) {
+      // Account exists: equalize timing with cost 12 hash and return uniform response
+      await bcrypt.hash(password || 'dummyPassword', 12);
+      return {
+        id: null,
+        username,
+        email: normalizedEmail,
+        requiresVerification: true,
+        message: 'If this address is eligible, a message was dispatched.'
+      };
     }
 
     const adminEmails = getAdminEmails();
     const isAdmin = adminEmails.includes(normalizedEmail);
     const role = isAdmin ? 'ADMIN' : 'USER';
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    let user;
-    if (existingEmail && !existingEmail.isEmailVerified) {
-      user = await prisma.user.update({
-        where: { id: existingEmail.id },
-        data: {
-          username,
-          passwordHash,
-          role,
-          status: 'PENDING'
-        }
-      });
-    } else {
-      user = await prisma.user.create({
-        data: {
-          username,
-          email: normalizedEmail,
-          passwordHash,
-          role,
-          status: 'PENDING',
-          isEmailVerified: false
-        }
-      });
-    }
+    const user = await prisma.user.create({
+      data: {
+        username,
+        email: normalizedEmail,
+        passwordHash,
+        role,
+        status: 'PENDING',
+        isEmailVerified: false
+      }
+    });
 
-    // Dispatch verification link via Firebase Authentication infrastructure
+    // Dispatch verification link via Firebase Authentication
     await firebaseAuthService.sendVerificationLink({
       email: normalizedEmail,
       password
+    }).catch(err => {
+      console.warn('[AuthService] Firebase verification send error:', err.message);
     });
 
     return {
@@ -86,7 +80,7 @@ export const authService = {
       username: user.username,
       email: user.email,
       requiresVerification: true,
-      message: 'VERIFICATION LINK DISPATCHED TO INSTITUTION INBOX.'
+      message: 'If this address is eligible, a message was dispatched.'
     };
   },
 
@@ -105,24 +99,51 @@ export const authService = {
     }
 
     const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-    if (!user) {
-      const err = new Error('Account not found.');
-      err.status = 404;
-      throw err;
+    if (!user || user.isEmailVerified || !user.passwordHash) {
+      // Equalize timing via dummy compare
+      await bcrypt.compare(password || 'dummyPassword', DUMMY_HASH);
+      return { success: true, message: 'If this address is eligible, a message was dispatched.' };
     }
 
-    if (user.isEmailVerified) {
-      const err = new Error('Account is already verified. Please sign in.');
+    const isValid = await bcrypt.compare(password || '', user.passwordHash);
+    if (isValid) {
+      await firebaseAuthService.sendVerificationLink({
+        email: normalizedEmail,
+        password: password || 'TempPassword123!'
+      }).catch(err => {
+        console.warn('[AuthService] Firebase resend link error:', err.message);
+      });
+    }
+
+    return { success: true, message: 'If this address is eligible, a message was dispatched.' };
+  },
+
+  async forgotPassword({ email }) {
+    if (!email) {
+      const err = new Error('Email is required.');
+      err.status = 400;
+      throw err;
+    }
+    const normalizedEmail = normalizeInstitutionEmail(email);
+    if (!normalizedEmail) {
+      const err = new Error('Invalid institutional email.');
       err.status = 400;
       throw err;
     }
 
-    await firebaseAuthService.sendVerificationLink({
-      email: normalizedEmail,
-      password: password || 'TempPassword123!'
-    });
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (user && user.status !== 'BLOCKED') {
+      await firebaseAuthService.sendPasswordResetLink({ email: normalizedEmail }).catch(err => {
+        console.warn('[AuthService] Firebase password reset error:', err.message);
+      });
+    } else {
+      await bcrypt.compare('dummyPassword', DUMMY_HASH);
+    }
 
-    return { success: true, message: 'Verification link re-sent to your institutional inbox.' };
+    return {
+      success: true,
+      message: 'If this address is eligible, a message was dispatched.'
+    };
   },
 
   async createAuthSession(user, userAgent = null, ip = null) {
@@ -132,11 +153,12 @@ export const authService = {
       data: { lastLoginAt: new Date() }
     });
 
-    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const rawRefreshToken = crypto.randomBytes(40).toString('hex');
+    const hashedRefreshToken = hashToken(rawRefreshToken);
     const session = await prisma.session.create({
       data: {
         userId: user.id,
-        refreshToken,
+        refreshToken: hashedRefreshToken,
         userAgent,
         ip,
         expiresAt: new Date(Date.now() + REFRESH_EXPIRES_MS)
@@ -151,7 +173,7 @@ export const authService = {
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: rawRefreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -165,31 +187,10 @@ export const authService = {
     };
   },
 
-  async checkEmail(raw) {
-    if (!raw) return { exists: false, isEmail: false };
-    const emailStr = String(raw).trim().toLowerCase();
-    if (!emailStr.includes('@')) {
-      return { exists: false, isEmail: false };
-    }
-    const normalized = normalizeInstitutionEmail(emailStr);
-    if (!normalized) {
-      return { exists: false, isEmail: true, validDomain: false };
-    }
-    const user = await prisma.user.findUnique({
-      where: { email: normalized },
-      select: { id: true, isEmailVerified: true }
-    });
-    return {
-      exists: Boolean(user),
-      isEmail: true,
-      validDomain: true
-    };
-  },
-
   async login({ identifier, email, password, userAgent = null, ip = null }) {
     const rawId = String(identifier || email || '').trim();
     if (!rawId) {
-      const err = new Error('Username or email is required.');
+      const err = new Error('Email or password is incorrect.');
       err.status = 401;
       throw err;
     }
@@ -198,30 +199,26 @@ export const authService = {
     if (rawId.includes('@')) {
       const normalizedEmail = normalizeInstitutionEmail(rawId);
       if (!normalizedEmail) {
-        const err = new Error('Invalid email or password.');
+        await bcrypt.compare(password || '', DUMMY_HASH);
+        const err = new Error('Email or password is incorrect.');
         err.status = 401;
         throw err;
       }
       user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-      if (!user) {
-        const err = new Error('No account found for this email. Please register.');
-        err.status = 404;
-        err.code = 'USER_NOT_FOUND';
-        throw err;
-      }
     } else {
       user = await prisma.user.findUnique({ where: { username: rawId } });
     }
 
     if (!user || !user.passwordHash) {
-      const err = new Error('Invalid credentials.');
+      await bcrypt.compare(password || '', DUMMY_HASH);
+      const err = new Error('Email or password is incorrect.');
       err.status = 401;
       throw err;
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
+    const isValid = await bcrypt.compare(password || '', user.passwordHash);
     if (!isValid) {
-      const err = new Error('Invalid credentials.');
+      const err = new Error('Email or password is incorrect.');
       err.status = 401;
       throw err;
     }
@@ -275,10 +272,18 @@ export const authService = {
       throw err;
     }
 
-    const session = await prisma.session.findUnique({
-      where: { refreshToken: token },
+    const hashedToken = hashToken(token);
+    let session = await prisma.session.findUnique({
+      where: { refreshToken: hashedToken },
       include: { user: true }
     });
+
+    if (!session) {
+      session = await prisma.session.findUnique({
+        where: { refreshToken: token },
+        include: { user: true }
+      });
+    }
 
     if (!session || session.expiresAt < new Date()) {
       if (session) await prisma.session.delete({ where: { id: session.id } }).catch(() => {});
@@ -305,11 +310,12 @@ export const authService = {
     }
 
     // Rotate refresh token
-    const newRefreshToken = crypto.randomBytes(40).toString('hex');
+    const newRawRefreshToken = crypto.randomBytes(40).toString('hex');
+    const newHashedRefreshToken = hashToken(newRawRefreshToken);
     await prisma.session.update({
       where: { id: session.id },
       data: {
-        refreshToken: newRefreshToken,
+        refreshToken: newHashedRefreshToken,
         userAgent: userAgent || session.userAgent,
         ip: ip || session.ip,
         expiresAt: new Date(Date.now() + REFRESH_EXPIRES_MS)
@@ -329,7 +335,7 @@ export const authService = {
 
     return {
       accessToken,
-      refreshToken: newRefreshToken,
+      refreshToken: newRawRefreshToken,
       user: {
         id: session.user.id,
         username: session.user.username,

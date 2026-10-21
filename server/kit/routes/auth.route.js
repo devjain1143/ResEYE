@@ -11,8 +11,8 @@ const router = Router();
 const pendingGoogleOk = new Map();
 
 router.post('/register', authLimiter, requireTurnstile('register'), authController.register);
-router.post('/resend-verification', authLimiter, authController.resendVerification);
-router.post('/forgot-password', authLimiter, authController.forgotPassword);
+router.post('/resend-verification', authLimiter, requireTurnstile('resend'), authController.resendVerification);
+router.post('/forgot-password', authLimiter, requireTurnstile('forgot'), authController.forgotPassword);
 router.post('/login', authLimiter, requireTurnstile('login'), authController.login);
 router.post('/refresh', authController.refresh);
 router.post('/logout', authenticateAllowPending, authController.logout);
@@ -24,8 +24,6 @@ router.get('/config', (req, res) => {
     googleEnabled: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
   });
 });
-
-router.get('/check-email', authLimiter, authController.checkEmail);
 
 router.post('/google/prepare', authLimiter, requireTurnstile('google'), (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {

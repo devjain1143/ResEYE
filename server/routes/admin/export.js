@@ -24,9 +24,10 @@ router.get('/:what', async (req, res, next) => {
     }
 
     const format = req.query.format === 'csv' ? 'csv' : 'json';
+    const passphrase = req.query.passphrase || req.headers['x-export-passphrase'] || null;
 
-    const result = await exportService.exportData(what, format);
-    await audit(req, 'DATA_EXPORT', what, { format, rowCount: result.rowCount });
+    const result = await exportService.exportData(what, format, passphrase);
+    await audit(req, 'DATA_EXPORT', what, { format, rowCount: result.rowCount, encrypted: result.encrypted });
 
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);

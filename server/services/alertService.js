@@ -1,4 +1,5 @@
 import { getDb } from '../core/db.js';
+import { encryptField, decryptField, getEncryptionMode } from '../crypto/index.js';
 
 export async function pushAdminTelegram(text) {
   if (!process.env.TELEGRAM_ALERT_BOT_TOKEN || !process.env.TELEGRAM_ALERT_CHAT_ID) return;
@@ -16,20 +17,27 @@ export async function pushAdminTelegram(text) {
 export const alertService = {
   async create(kind, webUserId, details = {}) {
     const db = getDb();
+    const detailsStr = typeof details === 'string' ? details : JSON.stringify(details);
+    const detailsEnc = encryptField(detailsStr, { table: 'security_alerts', column: 'details', rowId: 0 }, 'alerts');
+    const mode = getEncryptionMode();
+    const detailsPlain = mode === 'on' ? '{}' : detailsStr;
+
     const res = await db.query(
-      `INSERT INTO security_alerts (kind, web_user_id, details, status)
-       VALUES ($1, $2, $3, 'OPEN')
-       RETURNING id, kind, web_user_id, details, status, created_at`,
-      [kind, webUserId, JSON.stringify(details)]
+      `INSERT INTO security_alerts (kind, web_user_id, details, details_enc, status)
+       VALUES ($1, $2, $3, $4, 'OPEN')
+       RETURNING id, kind, web_user_id, details, details_enc, status, created_at`,
+      [kind, webUserId, detailsPlain, detailsEnc]
     );
 
     const alert = res.rows[0];
+    const alertOut = { ...alert, details };
+    delete alertOut.details_enc;
 
-    // Push optional alert notification to Telegram
-    const notice = `ALERT: ${kind} detected for user ${webUserId || 'unknown'}. Review security monitor.`;
+    // Push optional alert notification to Telegram (redacted, no raw PII)
+    const notice = `ALERT: ${kind} detected for subject ${webUserId ? 'user_' + webUserId.slice(0, 6) : 'unauthenticated'}. Review surveillance tape.`;
     pushAdminTelegram(notice).catch(() => {});
 
-    return alert;
+    return alertOut;
   },
 
   async list({ status = null, kind = null, page = 1, pageSize = 20 } = {}) {
@@ -57,7 +65,7 @@ export const alertService = {
     const offsetIdx = params.length;
 
     const res = await db.query(
-      `SELECT id, kind, web_user_id, details, status, created_at, resolved_by, resolved_at
+      `SELECT id, kind, web_user_id, details, details_enc, status, created_at, resolved_by, resolved_at
        FROM security_alerts
        ${where}
        ORDER BY created_at DESC
@@ -65,7 +73,21 @@ export const alertService = {
       params
     );
 
-    return { results: res.rows, total };
+    const results = res.rows.map(row => {
+      let details = row.details;
+      if (row.details_enc) {
+        try {
+          details = decryptField(row.details_enc, { table: 'security_alerts', column: 'details', rowId: row.id || 0 }, 'alerts', true);
+        } catch {
+          details = row.details;
+        }
+      }
+      const cleanRow = { ...row, details };
+      delete cleanRow.details_enc;
+      return cleanRow;
+    });
+
+    return { results, total };
   },
 
   async getUnreadCount() {
@@ -80,9 +102,21 @@ export const alertService = {
       `UPDATE security_alerts
        SET status = $1, resolved_by = $2, resolved_at = NOW()
        WHERE id = $3
-       RETURNING *`,
+       RETURNING id, kind, web_user_id, details, details_enc, status, created_at, resolved_by, resolved_at`,
       [status, adminId, id]
     );
-    return res.rows[0] || null;
+    const row = res.rows[0];
+    if (!row) return null;
+    let details = row.details;
+    if (row.details_enc) {
+      try {
+        details = decryptField(row.details_enc, { table: 'security_alerts', column: 'details', rowId: row.id || 0 }, 'alerts', true);
+      } catch {
+        details = row.details;
+      }
+    }
+    const cleanRow = { ...row, details };
+    delete cleanRow.details_enc;
+    return cleanRow;
   }
 };

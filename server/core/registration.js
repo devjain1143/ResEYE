@@ -2,8 +2,10 @@ import * as XLSXModule from 'xlsx';
 const XLSX = XLSXModule.default || XLSXModule;
 import path from 'path';
 import fs from 'fs';
+import { encryptFileBuffer, decryptFileBuffer } from '../crypto/index.js';
 
 const REGISTRATION_FILE = path.resolve(process.env.REGISTRATION_FILE_PATH || './data/registration_data.xlsx');
+const REGISTRATION_ENC_FILE = REGISTRATION_FILE.endsWith('.enc') ? REGISTRATION_FILE : `${REGISTRATION_FILE}.enc`;
 
 let registrationCache = null;
 let lastReloadTime = null;
@@ -97,23 +99,35 @@ export function loadRegistrationData(forceReload = false) {
 
   registrationCache = new Map();
 
-  let targetPath = REGISTRATION_FILE;
-  if (!fs.existsSync(targetPath)) {
-    const altPath = path.resolve('./registration_data.xlsx');
-    if (fs.existsSync(altPath)) {
-      targetPath = altPath;
+  try {
+    let workbook = null;
+    if (fs.existsSync(REGISTRATION_ENC_FILE)) {
+      const encContent = fs.readFileSync(REGISTRATION_ENC_FILE, 'utf8');
+      const decryptedBuf = decryptFileBuffer(encContent, 'registration_data.xlsx', 'v1');
+      workbook = XLSX.read(decryptedBuf, { type: 'buffer' });
+    } else if (fs.existsSync(REGISTRATION_FILE)) {
+      // Auto-migrate plaintext to encrypted file at rest
+      const plaintextBuf = fs.readFileSync(REGISTRATION_FILE);
+      workbook = XLSX.read(plaintextBuf, { type: 'buffer' });
+      try {
+        const encData = encryptFileBuffer(plaintextBuf, 'registration_data.xlsx', 'v1');
+        fs.writeFileSync(REGISTRATION_ENC_FILE, encData, 'utf8');
+        fs.unlinkSync(REGISTRATION_FILE);
+        console.log(`[Registration] Migrated plaintext file to encrypted storage: ${REGISTRATION_ENC_FILE}`);
+      } catch (err) {
+        console.warn('[Registration] Warning: could not persist encrypted file:', err.message);
+      }
     } else {
-      console.warn(`[Registration] File not found at ${targetPath}`);
+      console.warn(`[Registration] Registration file not found (checked ${REGISTRATION_ENC_FILE} and ${REGISTRATION_FILE})`);
       return registrationCache;
     }
-  }
 
-  try {
-    const workbook = XLSX.readFile(targetPath);
-    registrationCache = parseWorkbook(workbook);
-    lastReloadTime = new Date();
+    if (workbook) {
+      registrationCache = parseWorkbook(workbook);
+      lastReloadTime = new Date();
+    }
   } catch (err) {
-    console.error(`[Registration] Failed to read registration data:`, err.message);
+    console.error(`[Registration] Failed to load registration data:`, err.message);
   }
 
   return registrationCache;
@@ -129,11 +143,15 @@ export function reloadRegistrationData(buffer = null) {
     registrationCache = newCache;
     lastReloadTime = new Date();
 
-    // Optionally persist buffer to disk
+    // Persist encrypted file to disk
     try {
-      fs.writeFileSync(REGISTRATION_FILE, buffer);
+      const encEnvelope = encryptFileBuffer(buffer, 'registration_data.xlsx', 'v1');
+      fs.writeFileSync(REGISTRATION_ENC_FILE, encEnvelope, 'utf8');
+      if (fs.existsSync(REGISTRATION_FILE) && REGISTRATION_FILE !== REGISTRATION_ENC_FILE) {
+        try { fs.unlinkSync(REGISTRATION_FILE); } catch {}
+      }
     } catch (e) {
-      console.warn('[Registration] Could not write new sheet to disk:', e.message);
+      console.warn('[Registration] Could not write encrypted sheet to disk:', e.message);
     }
 
     return { rowCount: registrationCache.size, lastReloadTime };
@@ -146,12 +164,14 @@ export function reloadRegistrationData(buffer = null) {
 export function getRegistrationMetadata() {
   const cache = loadRegistrationData();
   const reloadTime = lastReloadTime || new Date();
+  const baseName = path.basename(REGISTRATION_ENC_FILE);
   return {
+    loaded: cache.size > 0,
     rowCount: cache.size,
     lastReloadTime: reloadTime,
     lastLoadedAt: reloadTime,
-    fileName: path.basename(REGISTRATION_FILE),
-    sourceFile: path.basename(REGISTRATION_FILE)
+    fileName: baseName,
+    sourceFile: baseName
   };
 }
 

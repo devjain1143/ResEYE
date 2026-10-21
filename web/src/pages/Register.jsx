@@ -198,7 +198,7 @@ export default function Register() {
                 Open your mailbox and click the verification link to activate operator clearance, then proceed to sign in.
               </p>
               <div className="border border-amber-500/40 bg-amber-500/10 p-2.5 text-[11px] text-amber-300 font-mono flex items-start space-x-2">
-                <span className="select-none font-bold text-amber-400">⚠️</span>
+                <span className="select-none font-bold text-amber-400">[!]</span>
                 <span>
                   <strong>NOTE:</strong> Institutional mail filters often deliver verification links into the <strong>Junk / Spam / Quarantine</strong> folder. Please check your Junk folder if the link does not appear in your primary inbox.
                 </span>

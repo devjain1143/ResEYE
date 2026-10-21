@@ -1,0 +1,48 @@
+name: ResEYE Security CI
+
+on:
+  push:
+    branches: [ main, security/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-audit:
+    name: Security & Cryptographic Verifications
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Run Gitleaks Secret Detector
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Audit Zero Emojis (UI Rule)
+        run: node scripts/check-no-emojis.js
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npm run prisma:generate
+
+      - name: Run Security Test Suite
+        env:
+          NODE_ENV: test
+          BYPASS_TURNSTILE: 'true'
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'reseye-ci-access-secret-389148' }}
+          DATA_KEK_V1: ${{ secrets.DATA_KEK_V1 || 'OiCYtBYMNSgcDo3JSmDipERWV/ucW6LV5Awo8EUpccQ=' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESBOT_DATABASE_URL: ${{ secrets.RESBOT_DATABASE_URL }}
+        run: npm run test:security

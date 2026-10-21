@@ -21,10 +21,14 @@ export const apiLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
+  limit: 100,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  keyGenerator: (req) => getIpKey(req.ip),
+  keyGenerator: (req) => {
+    const ip = getIpKey(req.ip);
+    const coarseSignal = req.headers['x-client-signal'] || req.headers['x-client-fingerprint'] || req.headers['sec-ch-ua'] || '';
+    return coarseSignal ? `${ip}:${coarseSignal}` : ip;
+  },
   message: {
     success: false,
     code: 'AUTH_RATE_LIMIT',

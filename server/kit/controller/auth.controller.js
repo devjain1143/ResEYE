@@ -1,6 +1,7 @@
+import crypto from 'crypto';
 import { authService } from '../service/auth.service.js';
-import { firebaseAuthService } from '../../services/firebaseAuthService.js';
 import { normalizeInstitutionEmail } from '../config/domain.js';
+import { alertService } from '../../services/alertService.js';
 
 const COOKIE_NAME = 'refreshToken';
 const COOKIE_OPTIONS = {
@@ -11,15 +12,99 @@ const COOKIE_OPTIONS = {
   path: '/api/auth'
 };
 
+// Progressive friction tracker: isolated by composite client fingerprint (IP + UA/signal)
+// Prevents shared campus NAT from locking out all legitimate institute students
+const frictionTracker = new Map();
+
+function trackAndApplyFriction(req, emailOrId) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || '127.0.0.1';
+  const ua = req.get('user-agent') || 'generic';
+  const coarseSignal = req.headers['x-client-signal'] || req.headers['x-client-fingerprint'] || req.headers['sec-ch-ua'] || '';
+  const fpHash = crypto.createHash('sha256').update(`${ua}:${coarseSignal}`).digest('hex').slice(0, 16);
+  const key = `${ip}:${fpHash}`;
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000; // 5 minutes
+
+  const entry = frictionTracker.get(key) || {
+    ip,
+    fpHash,
+    attempts: [],
+    emails: new Set()
+  };
+
+  entry.attempts = entry.attempts.filter(t => now - t < windowMs);
+  entry.attempts.push(now);
+
+  const clean = String(emailOrId || '').trim().toLowerCase();
+  if (clean.includes('@')) {
+    entry.emails.add(clean);
+  }
+  frictionTracker.set(key, entry);
+
+  const attemptCount = entry.attempts.length;
+  const distinctEmails = entry.emails.size;
+
+  let delayMs = 0;
+  if (attemptCount >= 5 && attemptCount < 10) {
+    delayMs = (attemptCount - 4) * 40; // 40ms to 200ms progressive delay
+  } else if (attemptCount >= 10) {
+    delayMs = 200 + Math.min((attemptCount - 9) * 50, 600); // 250ms to 800ms delay
+  }
+
+  // Throttle if aggressive enumeration (>= 8 distinct emails) or severe flooding (>= 25 attempts)
+  if (distinctEmails >= 8 || attemptCount >= 25) {
+    alertService.create('ENUMERATION', null, {
+      ip,
+      fingerprint: fpHash,
+      distinctCount: distinctEmails,
+      attemptCount,
+      reason: `Automated email enumeration detected: ${distinctEmails} distinct emails probed across ${attemptCount} attempts in 5 minutes.`
+    }).catch(() => {});
+
+    return {
+      blocked: true,
+      delayMs,
+      code: 'ENUMERATION_BLOCKED',
+      message: 'Suspicious verification activity detected. Access restricted.'
+    };
+  }
+
+  return {
+    blocked: false,
+    delayMs,
+    forceFreshTurnstile: attemptCount >= 10 || distinctEmails >= 5
+  };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of frictionTracker.entries()) {
+    val.attempts = val.attempts.filter(t => now - t < 5 * 60 * 1000);
+    if (val.attempts.length === 0) frictionTracker.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
 export const authController = {
   async register(req, res, next) {
     try {
+      const friction = trackAndApplyFriction(req, req.body.email);
+      if (friction.blocked) {
+        return res.status(429).json({
+          success: false,
+          code: friction.code,
+          message: friction.message
+        });
+      }
+      if (friction.delayMs > 0) {
+        await new Promise(r => setTimeout(r, friction.delayMs));
+      }
+
       const user = await authService.register(req.body);
       res.status(200).json({
         success: true,
         requiresVerification: true,
         email: user.email,
-        message: user.message || 'VERIFICATION LINK DISPATCHED TO INSTITUTION INBOX. (PLEASE CHECK JUNK / SPAM FOLDER).',
+        message: 'If this address is eligible, a message was dispatched.',
         user
       });
     } catch (err) {
@@ -27,25 +112,27 @@ export const authController = {
     }
   },
 
-  async checkEmail(req, res, next) {
-    try {
-      const raw = req.query.email || req.query.identifier;
-      const result = await authService.checkEmail(raw);
-      res.json({ success: true, ...result });
-    } catch (err) {
-      next(err);
-    }
-  },
-
   async resendVerification(req, res, next) {
     try {
-      const result = await authService.resendVerificationLink({
+      const friction = trackAndApplyFriction(req, req.body.email);
+      if (friction.blocked) {
+        return res.status(429).json({
+          success: false,
+          code: friction.code,
+          message: friction.message
+        });
+      }
+      if (friction.delayMs > 0) {
+        await new Promise(r => setTimeout(r, friction.delayMs));
+      }
+
+      await authService.resendVerificationLink({
         email: req.body.email,
         password: req.body.password
       });
       res.json({
         success: true,
-        message: result.message || 'NEW VERIFICATION LINK TRANSMITTED. (PLEASE CHECK JUNK / SPAM FOLDER).'
+        message: 'If this address is eligible, a message was dispatched.'
       });
     } catch (err) {
       next(err);
@@ -63,10 +150,22 @@ export const authController = {
         });
       }
 
-      const result = await firebaseAuthService.sendPasswordResetLink({ email: normalizedEmail });
+      const friction = trackAndApplyFriction(req, normalizedEmail);
+      if (friction.blocked) {
+        return res.status(429).json({
+          success: false,
+          code: friction.code,
+          message: friction.message
+        });
+      }
+      if (friction.delayMs > 0) {
+        await new Promise(r => setTimeout(r, friction.delayMs));
+      }
+
+      await authService.forgotPassword({ email: normalizedEmail });
       res.json({
         success: true,
-        message: result.message || 'PASSWORD RESET LINK DISPATCHED TO INBOX.'
+        message: 'If this address is eligible, a message was dispatched.'
       });
     } catch (err) {
       next(err);
@@ -75,8 +174,21 @@ export const authController = {
 
   async login(req, res, next) {
     try {
+      const identifier = req.body.identifier || req.body.email || req.body.username;
+      const friction = trackAndApplyFriction(req, identifier);
+      if (friction.blocked) {
+        return res.status(429).json({
+          success: false,
+          code: friction.code,
+          message: friction.message
+        });
+      }
+      if (friction.delayMs > 0) {
+        await new Promise(r => setTimeout(r, friction.delayMs));
+      }
+
       const result = await authService.login({
-        identifier: req.body.identifier || req.body.email || req.body.username,
+        identifier,
         email: req.body.email,
         password: req.body.password,
         userAgent: req.get('user-agent'),

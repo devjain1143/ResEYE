@@ -1,6 +1,7 @@
 import { getDb } from './db.js';
 import { getEmbedding } from './embeddings.js';
 import { searchRegistrationByName } from './registration.js';
+import { encryptField, decryptField, getEncryptionMode } from '../crypto/index.js';
 
 export async function getByScholarNo(scholarNo) {
   if (!scholarNo) return null;
@@ -207,12 +208,16 @@ export async function logSearch({ user = null, webUserId = null, student }) {
   const uid = webUserId || user?.id || null;
   const username = user?.username || user?.email || null;
   const firstName = user?.name || user?.username || null;
+  const mode = getEncryptionMode();
 
   try {
+    const studentNameEnc = encryptField(student.name, { table: 'search_history', column: 'student_name', rowId: 0 }, 'history');
+    const studentNamePlain = mode === 'on' ? 'STUDENT' : student.name;
+
     await db.query(
-      `INSERT INTO search_history (web_user_id, username, first_name, scholar_no, student_name)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [uid, username, firstName, student.scholar_no, student.name]
+      `INSERT INTO search_history (web_user_id, username, first_name, scholar_no, student_name, student_name_enc)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [uid, username, firstName, student.scholar_no, studentNamePlain, studentNameEnc]
     );
   } catch (err) {
     console.error('[Query] Failed to log search:', err.message);
@@ -252,7 +257,7 @@ export async function getSearchHistory({ range = 'all', userId = null, webUserId
   const offsetIdx = params.length;
 
   const dataRes = await db.query(`
-    SELECT id, user_id, web_user_id, username, first_name, scholar_no, student_name,
+    SELECT id, user_id, web_user_id, username, first_name, scholar_no, student_name, student_name_enc,
            TO_CHAR(timestamp + interval '5 hours 30 minutes', 'YYYY-MM-DD HH12:MI:SS AM') as timestamp
     FROM search_history
     ${whereClause}
@@ -260,20 +265,46 @@ export async function getSearchHistory({ range = 'all', userId = null, webUserId
     LIMIT $${limitIdx} OFFSET $${offsetIdx}
   `, params);
 
-  return { results: dataRes.rows, total };
+  const results = dataRes.rows.map(row => {
+    let student_name = row.student_name;
+    if (row.student_name_enc) {
+      try {
+        student_name = decryptField(row.student_name_enc, { table: 'search_history', column: 'student_name', rowId: row.id || 0 }, 'history');
+      } catch {
+        student_name = row.student_name;
+      }
+    }
+    const clean = { ...row, student_name };
+    delete clean.student_name_enc;
+    return clean;
+  });
+
+  return { results, total };
 }
 
 export async function getHistoryByScholarNo(scholarNo) {
   const db = getDb();
   const res = await db.query(
-    `SELECT id, user_id, web_user_id, username, first_name, scholar_no, student_name,
+    `SELECT id, user_id, web_user_id, username, first_name, scholar_no, student_name, student_name_enc,
             TO_CHAR(timestamp + interval '5 hours 30 minutes', 'YYYY-MM-DD HH12:MI:SS AM') as timestamp
      FROM search_history
      WHERE UPPER(scholar_no) = UPPER($1)
      ORDER BY id DESC`,
     [scholarNo.trim()]
   );
-  return res.rows;
+  return res.rows.map(row => {
+    let student_name = row.student_name;
+    if (row.student_name_enc) {
+      try {
+        student_name = decryptField(row.student_name_enc, { table: 'search_history', column: 'student_name', rowId: row.id || 0 }, 'history');
+      } catch {
+        student_name = row.student_name;
+      }
+    }
+    const clean = { ...row, student_name };
+    delete clean.student_name_enc;
+    return clean;
+  });
 }
 
 export async function logAiQuery({
@@ -290,11 +321,15 @@ export async function logAiQuery({
   isCacheHit = false
 }) {
   const db = getDb();
+  const mode = getEncryptionMode();
+  const queryTextEnc = encryptField(queryText, { table: 'ai_query_history', column: 'query_text', rowId: 0 }, 'history');
+  const queryTextPlain = mode === 'on' ? 'AI_QUERY' : queryText;
+
   const sql = `
     INSERT INTO ai_query_history (
-      user_id, web_user_id, username, first_name, query_text, intent, batch, semester,
+      user_id, web_user_id, username, first_name, query_text, query_text_enc, intent, batch, semester,
       is_answered, rejection_reason, is_cache_hit
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING id
   `;
   const res = await db.query(sql, [
@@ -302,7 +337,8 @@ export async function logAiQuery({
     webUserId || (typeof userId === 'string' ? userId : null),
     username,
     firstName,
-    queryText,
+    queryTextPlain,
+    queryTextEnc,
     intent,
     batch,
     semester ? parseInt(semester, 10) : null,
@@ -355,7 +391,7 @@ export async function getAiHistoryByFilter({ range = 'all', userId = null, webUs
   const offsetIdx = params.length;
 
   const dataRes = await db.query(`
-    SELECT id, user_id, web_user_id, username, first_name, query_text, intent, batch, semester,
+    SELECT id, user_id, web_user_id, username, first_name, query_text, query_text_enc, intent, batch, semester,
            is_answered, rejection_reason, is_cache_hit, rating,
            TO_CHAR(timestamp + interval '5 hours 30 minutes', 'YYYY-MM-DD HH12:MI:SS AM') as timestamp
     FROM ai_query_history
@@ -364,7 +400,21 @@ export async function getAiHistoryByFilter({ range = 'all', userId = null, webUs
     LIMIT $${limitIdx} OFFSET $${offsetIdx}
   `, params);
 
-  return { results: dataRes.rows, total };
+  const results = dataRes.rows.map(row => {
+    let query_text = row.query_text;
+    if (row.query_text_enc) {
+      try {
+        query_text = decryptField(row.query_text_enc, { table: 'ai_query_history', column: 'query_text', rowId: row.id || 0 }, 'history');
+      } catch {
+        query_text = row.query_text;
+      }
+    }
+    const clean = { ...row, query_text };
+    delete clean.query_text_enc;
+    return clean;
+  });
+
+  return { results, total };
 }
 
 export async function getUnratedAiQueries(page = 1, pageSize = 1) {
@@ -374,7 +424,7 @@ export async function getUnratedAiQueries(page = 1, pageSize = 1) {
 
   const offset = (page - 1) * pageSize;
   const res = await db.query(
-    `SELECT id, user_id, web_user_id, username, first_name, query_text, intent, batch, semester,
+    `SELECT id, user_id, web_user_id, username, first_name, query_text, query_text_enc, intent, batch, semester,
             is_answered, rejection_reason, is_cache_hit,
             TO_CHAR(timestamp + interval '5 hours 30 minutes', 'YYYY-MM-DD HH12:MI:SS AM') as timestamp
      FROM ai_query_history
@@ -383,20 +433,48 @@ export async function getUnratedAiQueries(page = 1, pageSize = 1) {
      LIMIT $1 OFFSET $2`,
     [pageSize, offset]
   );
-  return { results: res.rows, total };
+
+  const results = res.rows.map(row => {
+    let query_text = row.query_text;
+    if (row.query_text_enc) {
+      try {
+        query_text = decryptField(row.query_text_enc, { table: 'ai_query_history', column: 'query_text', rowId: row.id || 0 }, 'history');
+      } catch {
+        query_text = row.query_text;
+      }
+    }
+    const clean = { ...row, query_text };
+    delete clean.query_text_enc;
+    return clean;
+  });
+
+  return { results, total };
 }
 
 export async function getAiQueryById(id) {
   const db = getDb();
   const res = await db.query(
-    `SELECT id, user_id, web_user_id, username, first_name, query_text, intent, batch, semester,
+    `SELECT id, user_id, web_user_id, username, first_name, query_text, query_text_enc, intent, batch, semester,
             is_answered, rejection_reason, is_cache_hit, rating,
             TO_CHAR(timestamp + interval '5 hours 30 minutes', 'YYYY-MM-DD HH12:MI:SS AM') as timestamp
      FROM ai_query_history
      WHERE id = $1`,
     [id]
   );
-  return res.rows[0] || null;
+  const row = res.rows[0];
+  if (!row) return null;
+
+  let query_text = row.query_text;
+  if (row.query_text_enc) {
+    try {
+      query_text = decryptField(row.query_text_enc, { table: 'ai_query_history', column: 'query_text', rowId: row.id || 0 }, 'history');
+    } catch {
+      query_text = row.query_text;
+    }
+  }
+  const clean = { ...row, query_text };
+  delete clean.query_text_enc;
+  return clean;
 }
 
 export async function rateAiQuery(id, rating) {
@@ -407,6 +485,16 @@ export async function rateAiQuery(id, rating) {
 
 export async function addFeedbackCorrection(queryText, wrongOutput, correctOutput, webUserId = null) {
   const db = getDb();
+  const mode = getEncryptionMode();
+
+  const queryTextEnc = encryptField(queryText, { table: 'feedback_corrections', column: 'query_text', rowId: 0 }, 'history');
+  const wrongOutputEnc = encryptField(wrongOutput, { table: 'feedback_corrections', column: 'wrong_output', rowId: 0 }, 'history');
+  const correctOutputEnc = encryptField(correctOutput, { table: 'feedback_corrections', column: 'correct_output', rowId: 0 }, 'history');
+
+  const queryTextPlain = mode === 'on' ? 'FEEDBACK_QUERY' : queryText;
+  const wrongOutputPlain = mode === 'on' ? 'FEEDBACK_WRONG' : wrongOutput;
+  const correctOutputPlain = mode === 'on' ? 'FEEDBACK_CORRECT' : correctOutput;
+
   let embedding = null;
   try {
     embedding = await getEmbedding(queryText);
@@ -417,15 +505,19 @@ export async function addFeedbackCorrection(queryText, wrongOutput, correctOutpu
   if (embedding) {
     const vecStr = `[${embedding.join(',')}]`;
     const res = await db.query(
-      'INSERT INTO feedback_corrections (query_text, wrong_output, correct_output, embedding, web_user_id) VALUES ($1, $2, $3, $4::vector, $5) RETURNING id',
-      [queryText, wrongOutput, correctOutput, vecStr, webUserId]
+      `INSERT INTO feedback_corrections (
+        query_text, query_text_enc, wrong_output, wrong_output_enc, correct_output, correct_output_enc, embedding, web_user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8) RETURNING id`,
+      [queryTextPlain, queryTextEnc, wrongOutputPlain, wrongOutputEnc, correctOutputPlain, correctOutputEnc, vecStr, webUserId]
     );
     return res.rows[0];
   }
 
   const res = await db.query(
-    'INSERT INTO feedback_corrections (query_text, wrong_output, correct_output, web_user_id) VALUES ($1, $2, $3, $4) RETURNING id',
-    [queryText, wrongOutput, correctOutput, webUserId]
+    `INSERT INTO feedback_corrections (
+      query_text, query_text_enc, wrong_output, wrong_output_enc, correct_output, correct_output_enc, web_user_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [queryTextPlain, queryTextEnc, wrongOutputPlain, wrongOutputEnc, correctOutputPlain, correctOutputEnc, webUserId]
   );
   return res.rows[0];
 }
@@ -439,7 +531,7 @@ export async function findSimilarCorrections(queryText, maxResults = 3) {
     if (embedding) {
       const vecStr = `[${embedding.join(',')}]`;
       const res = await db.query(
-        `SELECT id, query_text, wrong_output, correct_output,
+        `SELECT id, query_text, query_text_enc, wrong_output, wrong_output_enc, correct_output, correct_output_enc,
                 1 - (embedding <=> $1::vector) as similarity
          FROM feedback_corrections
          WHERE embedding IS NOT NULL
@@ -449,7 +541,27 @@ export async function findSimilarCorrections(queryText, maxResults = 3) {
       );
 
       const relevant = (res.rows || []).filter(r => r.similarity >= 0.5);
-      if (relevant.length > 0) return relevant;
+      if (relevant.length > 0) {
+        return relevant.map(r => {
+          let qt = r.query_text;
+          let wo = r.wrong_output;
+          let co = r.correct_output;
+          if (r.query_text_enc) {
+            try { qt = decryptField(r.query_text_enc, { table: 'feedback_corrections', column: 'query_text', rowId: r.id || 0 }, 'history'); } catch {}
+          }
+          if (r.wrong_output_enc) {
+            try { wo = decryptField(r.wrong_output_enc, { table: 'feedback_corrections', column: 'wrong_output', rowId: r.id || 0 }, 'history'); } catch {}
+          }
+          if (r.correct_output_enc) {
+            try { co = decryptField(r.correct_output_enc, { table: 'feedback_corrections', column: 'correct_output', rowId: r.id || 0 }, 'history'); } catch {}
+          }
+          const clean = { ...r, query_text: qt, wrong_output: wo, correct_output: co };
+          delete clean.query_text_enc;
+          delete clean.wrong_output_enc;
+          delete clean.correct_output_enc;
+          return clean;
+        });
+      }
     }
   } catch (err) {
     console.warn('[Feedback] Vector search fallback to tokens:', err.message);
@@ -457,9 +569,25 @@ export async function findSimilarCorrections(queryText, maxResults = 3) {
 
   try {
     const res = await db.query(
-      'SELECT id, query_text, wrong_output, correct_output FROM feedback_corrections ORDER BY id DESC LIMIT 100'
+      'SELECT id, query_text, query_text_enc, wrong_output, wrong_output_enc, correct_output, correct_output_enc FROM feedback_corrections ORDER BY id DESC LIMIT 100'
     );
     if (!res.rows || res.rows.length === 0) return [];
+
+    const decryptedRows = res.rows.map(row => {
+      let qt = row.query_text;
+      let wo = row.wrong_output;
+      let co = row.correct_output;
+      if (row.query_text_enc) {
+        try { qt = decryptField(row.query_text_enc, { table: 'feedback_corrections', column: 'query_text', rowId: row.id || 0 }, 'history'); } catch {}
+      }
+      if (row.wrong_output_enc) {
+        try { wo = decryptField(row.wrong_output_enc, { table: 'feedback_corrections', column: 'wrong_output', rowId: row.id || 0 }, 'history'); } catch {}
+      }
+      if (row.correct_output_enc) {
+        try { co = decryptField(row.correct_output_enc, { table: 'feedback_corrections', column: 'correct_output', rowId: row.id || 0 }, 'history'); } catch {}
+      }
+      return { id: row.id, query_text: qt, wrong_output: wo, correct_output: co };
+    });
 
     const tokenize = s => new Set(
       s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2)
@@ -467,7 +595,7 @@ export async function findSimilarCorrections(queryText, maxResults = 3) {
     const queryTokens = tokenize(queryText);
     if (queryTokens.size === 0) return [];
 
-    const scored = res.rows.map(row => {
+    const scored = decryptedRows.map(row => {
       const rowTokens = tokenize(row.query_text);
       if (rowTokens.size === 0) return { ...row, score: 0 };
       let overlap = 0;
@@ -505,13 +633,18 @@ export async function isSpecialScholar(scholarNo) {
 
 export async function addSpecialScholar(scholarNo, webUserId = null, note = null) {
   if (!scholarNo) return false;
+  const cleanNo = scholarNo.trim().toUpperCase();
+  const mode = getEncryptionMode();
+  const noteEnc = note ? encryptField(note, { table: 'special_scholars', column: 'note', rowId: cleanNo }, 'alerts') : null;
+  const notePlain = mode === 'on' ? 'SURVEILLANCE_NOTE' : note;
+
   try {
     const db = getDb();
     const res = await db.query(
-      `INSERT INTO special_scholars (scholar_no, added_by_web_user_id, note)
-       VALUES (UPPER($1), $2, $3)
-       ON CONFLICT (scholar_no) DO UPDATE SET note = EXCLUDED.note, added_by_web_user_id = EXCLUDED.added_by_web_user_id`,
-      [scholarNo.trim(), webUserId, note]
+      `INSERT INTO special_scholars (scholar_no, added_by_web_user_id, note, note_enc)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (scholar_no) DO UPDATE SET note = EXCLUDED.note, note_enc = EXCLUDED.note_enc, added_by_web_user_id = EXCLUDED.added_by_web_user_id`,
+      [cleanNo, webUserId, notePlain, noteEnc]
     );
     return res.rowCount > 0;
   } catch (err) {
@@ -539,12 +672,24 @@ export async function getSpecialScholars() {
   try {
     const db = getDb();
     const res = await db.query(
-      `SELECT scholar_no, note, added_by_web_user_id,
+      `SELECT scholar_no, note, note_enc, added_by_web_user_id,
               TO_CHAR(added_at + interval '5 hours 30 minutes', 'YYYY-MM-DD HH12:MI:SS AM') as added_at
        FROM special_scholars
        ORDER BY added_at DESC`
     );
-    return res.rows;
+    return res.rows.map(row => {
+      let note = row.note;
+      if (row.note_enc) {
+        try {
+          note = decryptField(row.note_enc, { table: 'special_scholars', column: 'note', rowId: row.scholar_no }, 'alerts');
+        } catch {
+          note = row.note;
+        }
+      }
+      const clean = { ...row, note };
+      delete clean.note_enc;
+      return clean;
+    });
   } catch (err) {
     console.error('[Special] Query failed:', err.message);
     return [];

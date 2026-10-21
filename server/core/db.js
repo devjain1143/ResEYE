@@ -174,6 +174,15 @@ export async function initSchema() {
     });
   }
 
+  // Run encryption schema migration (002_encryption.sql)
+  const encryptionMigrationPath = path.resolve(__dirname, '../../migrations/002_encryption.sql');
+  if (fs.existsSync(encryptionMigrationPath)) {
+    const encSql = fs.readFileSync(encryptionMigrationPath, 'utf-8');
+    await db.query(encSql).catch(err => {
+      console.warn('[DB] Encryption schema migration notice:', err.message);
+    });
+  }
+
   // Vector extension setup if available
   try {
     await db.query('CREATE EXTENSION IF NOT EXISTS vector');

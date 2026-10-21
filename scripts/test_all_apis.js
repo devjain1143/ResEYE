@@ -33,11 +33,11 @@ async function testAll() {
     try {
       const result = await adapterFn(TEST_PROMPT, provider);
       const elapsed = Date.now() - start;
-      console.log(`✅ SUCCESS in ${elapsed}ms`);
+      console.log(`[PASS] SUCCESS in ${elapsed}ms`);
       console.log('   Response:', JSON.stringify(result));
     } catch (err) {
       const elapsed = Date.now() - start;
-      console.log(`❌ FAILED in ${elapsed}ms`);
+      console.log(`[FAIL] FAILED in ${elapsed}ms`);
       console.log(`   Error: ${err.message}`);
     }
     console.log('----------------------------------------------------------------------');

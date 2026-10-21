@@ -21,6 +21,8 @@ import favoritesRouter from './routes/favorites.js';
 import adminRouter from './routes/admin/index.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
+import { requestLogger } from './middleware/logger.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -31,6 +33,11 @@ app.set('trust proxy', 1);
 
 app.use(
   helmet({
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -45,6 +52,7 @@ app.use(
   })
 );
 
+app.use(requestLogger);
 app.use(express.json({ limit: '50kb' }));
 app.use(cookieParser());
 app.use(passport.initialize());
@@ -121,8 +129,34 @@ if (fs.existsSync(webDistPath)) {
 app.use(notFound);
 app.use(errorHandler);
 
+function validateBootSecrets() {
+  const isProd = process.env.NODE_ENV === 'production';
+  const required = ['JWT_ACCESS_SECRET'];
+  if (isProd) {
+    required.push('DATA_KEK_V1', 'DATABASE_URL', 'TURNSTILE_SECRET_KEY');
+  }
+
+  for (const sec of required) {
+    const val = process.env[sec];
+    if (!val || val.trim().length === 0) {
+      throw new Error(`FATAL: Mandatory secret environment variable missing: ${sec}`);
+    }
+    if (val.length < 16) {
+      throw new Error(`FATAL: Secret [${sec}] does not satisfy minimum entropy requirements (minimum 16 chars)`);
+    }
+  }
+
+  // Ensure secrets are distinct
+  const jwtSec = process.env.JWT_ACCESS_SECRET;
+  const kek = process.env.DATA_KEK_V1;
+  if (kek && jwtSec && kek === jwtSec) {
+    throw new Error('FATAL: Reused secret keys detected across distinct cryptographic purposes.');
+  }
+}
+
 async function startServer() {
   try {
+    validateBootSecrets();
     console.log('[ResEYE] Initializing database and surveillance tables...');
     await initSchema().catch(err => {
       console.warn('[ResEYE] Database init notice:', err.message);

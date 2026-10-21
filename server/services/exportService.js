@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getDb } from '../core/db.js';
 import prisma from '../kit/lib/prisma.js';
 
@@ -25,7 +26,7 @@ function toCsv(rows) {
 }
 
 export const exportService = {
-  async exportData(what, format = 'json') {
+  async exportData(what, format = 'json', passphrase = null) {
     const db = getDb();
     let rows = [];
 
@@ -100,20 +101,36 @@ export const exportService = {
       }
     }
 
-    if (format === 'csv') {
+    const rawOutput = format === 'csv' ? toCsv(rows) : JSON.stringify(rows, null, 2);
+    const contentType = format === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8';
+    const filename = `${what}-${Date.now()}.${format}`;
+
+    if (passphrase && typeof passphrase === 'string' && passphrase.trim().length > 0) {
+      const salt = crypto.randomBytes(16);
+      const iv = crypto.randomBytes(12);
+      const derivedKey = crypto.scryptSync(passphrase.trim(), salt, 32);
+      const cipher = crypto.createCipheriv('aes-256-gcm', derivedKey, iv);
+      const ciphertext = Buffer.concat([cipher.update(rawOutput, 'utf8'), cipher.final()]);
+      const tag = cipher.getAuthTag();
+
+      const magic = Buffer.from('RESEYE_EXPORT_V1', 'utf8');
+      const encryptedPayload = Buffer.concat([magic, salt, iv, tag, ciphertext]);
+
       return {
-        contentType: 'text/csv; charset=utf-8',
-        filename: `${what}-${Date.now()}.csv`,
-        data: toCsv(rows),
-        rowCount: rows.length
+        contentType: 'application/octet-stream',
+        filename: `${what}-${Date.now()}.enc`,
+        data: encryptedPayload,
+        rowCount: rows.length,
+        encrypted: true
       };
     }
 
     return {
-      contentType: 'application/json; charset=utf-8',
-      filename: `${what}-${Date.now()}.json`,
-      data: JSON.stringify(rows, null, 2),
-      rowCount: rows.length
+      contentType,
+      filename,
+      data: rawOutput,
+      rowCount: rows.length,
+      encrypted: false
     };
   }
 };

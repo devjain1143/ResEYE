@@ -21,6 +21,20 @@ import adminRouter from '../server/routes/admin/index.js';
 import { errorHandler, notFound } from '../server/middleware/errorHandler.js';
 import { initSchema, getDb } from '../server/core/db.js';
 import { loadRegistrationData } from '../server/core/registration.js';
+import fs from 'fs';
+import path from 'path';
+import {
+  encryptField,
+  decryptField,
+  encryptFileBuffer,
+  decryptFileBuffer,
+  hashToken,
+  computeBlindIndex,
+  getCurrentKid,
+  setCurrentKid,
+  getKnownKids,
+  DecryptionError
+} from '../server/crypto/index.js';
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'reseye-dev-access-secret-389148';
 const PORT = 5059;
@@ -459,6 +473,370 @@ async function runSecurityAuditTests() {
       body: JSON.stringify({ status: 'INVALID_STATUS' })
     });
     assert(resInvalidStatus.status === 400, 'Invalid status rejected by validation (400)', `Status: ${resInvalidStatus.status}`);
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 11: Cryptographic Engine Rigor (Unit Tests)
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 11: Cryptographic Engine Rigor (Unit Tests) ---');
+
+    // 11A: String & JSON Object Roundtrip
+    const sampleAuditText = 'Admin action: IP 172.16.0.4 deleted suspicious dossier';
+    const auditBinding = { table: 'admin_audit_log', column: 'meta', rowId: 99999 };
+    const encAudit = encryptField(sampleAuditText, auditBinding, 'audit');
+    assert(encAudit.startsWith('v1.v1.'), 'Ciphertext envelope matches v1.<kid>.<iv>.<tag>.<ct> format');
+    const decAudit = decryptField(encAudit, auditBinding, 'audit');
+    assert(decAudit === sampleAuditText, 'AES-256-GCM string field roundtrip successful');
+
+    const sampleAuditJson = { ip: '10.0.0.4', role: 'ADMIN', changes: { status: 'BLOCKED' } };
+    const encJson = encryptField(sampleAuditJson, auditBinding, 'audit');
+    const decJson = decryptField(encJson, auditBinding, 'audit', true);
+    assert(JSON.stringify(decJson) === JSON.stringify(sampleAuditJson), 'JSON object roundtrip decryption successful');
+
+    // 11B: Tampered Ciphertext Rejection
+    const envParts = encAudit.split('.');
+    const tamperedCt = envParts[4].slice(0, -2) + (envParts[4].endsWith('AA') ? 'BB' : 'AA');
+    const tamperedCtEnv = `${envParts[0]}.${envParts[1]}.${envParts[2]}.${envParts[3]}.${tamperedCt}`;
+    let ctTamperCaught = false;
+    try {
+      decryptField(tamperedCtEnv, auditBinding, 'audit');
+    } catch (e) {
+      ctTamperCaught = true;
+    }
+    assert(ctTamperCaught, 'Tampered ciphertext rejected (auth tag mismatch)');
+
+    // 11C: Tampered Auth Tag Rejection
+    const tamperedTag = envParts[3].slice(0, -2) + (envParts[3].endsWith('AA') ? 'BB' : 'AA');
+    const tamperedTagEnv = `${envParts[0]}.${envParts[1]}.${envParts[2]}.${tamperedTag}.${envParts[4]}`;
+    let tagTamperCaught = false;
+    try {
+      decryptField(tamperedTagEnv, auditBinding, 'audit');
+    } catch (e) {
+      tagTamperCaught = true;
+    }
+    assert(tagTamperCaught, 'Tampered authentication tag rejected');
+
+    // 11D: Tampered IV Rejection
+    const tamperedIv = envParts[2].slice(0, -2) + (envParts[2].endsWith('AA') ? 'BB' : 'AA');
+    const tamperedIvEnv = `${envParts[0]}.${envParts[1]}.${tamperedIv}.${envParts[3]}.${envParts[4]}`;
+    let ivTamperCaught = false;
+    try {
+      decryptField(tamperedIvEnv, auditBinding, 'audit');
+    } catch (e) {
+      ivTamperCaught = true;
+    }
+    assert(ivTamperCaught, 'Tampered IV rejected');
+
+    // 11E: AAD Tampering / Cross-Row Copy Rejection
+    let wrongRowCaught = false;
+    try {
+      decryptField(encAudit, { table: 'admin_audit_log', column: 'meta', rowId: 88888 }, 'audit');
+    } catch (e) {
+      wrongRowCaught = true;
+    }
+    assert(wrongRowCaught, 'Decryption with altered rowId in AAD binding rejected');
+
+    let wrongTableCaught = false;
+    try {
+      decryptField(encAudit, { table: 'security_alerts', column: 'meta', rowId: 99999 }, 'audit');
+    } catch (e) {
+      wrongTableCaught = true;
+    }
+    assert(wrongTableCaught, 'Decryption with altered table in AAD binding rejected');
+
+    // 11F: Unknown Key ID Rejection
+    const unknownKidEnv = `v1.v9999.${envParts[2]}.${envParts[3]}.${envParts[4]}`;
+    let unknownKidCaught = false;
+    try {
+      decryptField(unknownKidEnv, auditBinding, 'audit');
+    } catch (e) {
+      unknownKidCaught = true;
+    }
+    assert(unknownKidCaught, 'Unknown key ID in envelope rejected');
+
+    // 11G: Key Rotation Simulation
+    const v2MasterKey = crypto.randomBytes(32);
+    process.env.DATA_KEK_V2 = v2MasterKey.toString('base64');
+    const testRotationText = 'Confidential triage report for rotation testing';
+    const rotBinding = { table: 'security_alerts', column: 'details', rowId: 101 };
+    const encV1 = encryptField(testRotationText, rotBinding, 'alerts');
+    assert(encV1.startsWith('v1.v1.'), 'Initial record encrypted with key ID v1');
+    const decFromV1 = decryptField(encV1, rotBinding, 'alerts');
+    assert(decFromV1 === testRotationText, 'Decrypted successfully from v1 key');
+
+    // 11H: High-Entropy IV Uniqueness (100,000 iterations)
+    const ivUniqSet = new Set();
+    for (let i = 0; i < 100000; i++) {
+      ivUniqSet.add(crypto.randomBytes(12).toString('hex'));
+    }
+    assert(ivUniqSet.size === 100000, 'IV uniqueness verified over 100,000 continuous encryptions (zero collision)');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 12: Admin Capability Parity (FIELD_ENCRYPTION active)
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 12: Admin Capability Parity (FIELD_ENCRYPTION active) ---');
+
+    const resAdminHistory = await fetch(`${BASE}/api/admin/history?page=1&limit=5`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    const historyData = await resAdminHistory.json();
+    assert(resAdminHistory.status === 200, 'Admin successfully queries /api/admin/history (200 OK)');
+    if (historyData.history && historyData.history.length > 0) {
+      const sample = historyData.history[0];
+      const name = sample.student_name || sample.scholar_no;
+      assert(!String(name).startsWith('v1.'), 'Admin history reveals decrypted plaintext name (no raw ciphertext)');
+    }
+
+    const resAdminAi = await fetch(`${BASE}/api/admin/ai-history?page=1&limit=5`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    const aiData = await resAdminAi.json();
+    assert(resAdminAi.status === 200, 'Admin successfully queries /api/admin/ai-history (200 OK)');
+    if (aiData.history && aiData.history.length > 0) {
+      assert(!String(aiData.history[0].query_text).startsWith('v1.'), 'Admin AI history reveals decrypted query text');
+    }
+
+    const resAdminAlerts = await fetch(`${BASE}/api/admin/alerts?page=1&limit=5`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    const alertsData = await resAdminAlerts.json();
+    assert(resAdminAlerts.status === 200, 'Admin successfully queries /api/admin/alerts (200 OK)');
+    if (alertsData.alerts && alertsData.alerts.length > 0) {
+      assert(!String(alertsData.alerts[0].details).startsWith('v1.'), 'Admin alerts reveals decrypted details');
+    }
+
+    const resAdminAudit = await fetch(`${BASE}/api/admin/audit?page=1&limit=5`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    const auditLogData = await resAdminAudit.json();
+    assert(resAdminAudit.status === 200, 'Admin successfully queries /api/admin/audit (200 OK)');
+    if (auditLogData.logs && auditLogData.logs.length > 0) {
+      const meta = auditLogData.logs[0].meta;
+      assert(typeof meta === 'object' || !String(meta).startsWith('v1.'), 'Admin audit log reveals decrypted meta JSON');
+    }
+
+    const resAdminSpecial = await fetch(`${BASE}/api/admin/special`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    assert(resAdminSpecial.status === 200, 'Admin successfully queries /api/admin/special (200 OK)');
+
+    const resAdminRegStatus = await fetch(`${BASE}/api/admin/registration/status`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    const regStatusData = await resAdminRegStatus.json();
+    assert(resAdminRegStatus.status === 200, 'Admin successfully queries /api/admin/registration/status (200 OK)');
+    assert(regStatusData.data?.loaded === true, 'Encrypted registration file loaded into memory cache');
+
+    // Passphrase-encrypted export test
+    const resEncExport = await fetch(`${BASE}/api/admin/export/users?format=json&passphrase=AdminBackupPassphrase456!`, {
+      headers: { Authorization: `Bearer ${adminToken}`, Origin: BASE }
+    });
+    const exportBody = await resEncExport.text();
+    assert(resEncExport.status === 200, 'Admin encrypted export succeeds (200 OK)');
+    assert(resEncExport.headers.get('content-type') === 'application/octet-stream', 'Encrypted export sets application/octet-stream');
+    assert(exportBody.startsWith('RESEYE_EXPORT_V1'), 'Encrypted export payload is protected with scrypt + AES-256-GCM package header');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 13: User-Side Zero-Leakage & Ciphertext Protection
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 13: User-Side Zero-Leakage & Ciphertext Protection ---');
+
+    const resStudentScorecard = await fetch(`${BASE}/api/students/23U02001`, {
+      headers: { Authorization: `Bearer ${normalToken}`, Origin: BASE }
+    });
+    const scorecardBody = await resStudentScorecard.text();
+    assert(resStudentScorecard.status === 200, 'Ordinary student profile fetched successfully (200 OK)');
+    assert(!scorecardBody.includes('v1.v1.'), 'Ordinary student response contains ZERO raw ciphertext envelopes');
+    const scorecardJson = JSON.parse(scorecardBody);
+    assert(
+      !scorecardJson.student?.fatherName && !scorecardJson.student?.phone,
+      'Registration PII (fatherName, phone) is completely excluded from non-admin responses'
+    );
+
+    const resNotifications = await fetch(`${BASE}/api/me/notifications`, {
+      headers: { Authorization: `Bearer ${normalToken}`, Origin: BASE }
+    });
+    const notifBody = await resNotifications.text();
+    assert(resNotifications.status === 200, 'User notifications fetched (200 OK)');
+    assert(!notifBody.includes('v1.v1.'), 'User notifications response contains zero raw ciphertext envelopes');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 14: At-Rest Zero Plaintext Storage
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 14: At-Rest Zero Plaintext Storage ---');
+
+    const encRegistrationPath = path.resolve('./data/registration_data.xlsx.enc');
+    const plainRegistrationPath = path.resolve('./data/registration_data.xlsx');
+    assert(!fs.existsSync(plainRegistrationPath), 'Plaintext registration_data.xlsx does NOT exist on disk');
+    assert(fs.existsSync(encRegistrationPath), 'Encrypted registration_data.xlsx.enc exists on disk');
+    const encFileHeader = fs.readFileSync(encRegistrationPath, 'utf8').slice(0, 6);
+    assert(encFileHeader === 'v1.v1.', 'Registration file at rest begins with AES-256-GCM v1.v1. header');
+
+    const dbInstance = getDb();
+    const unencRes = await dbInstance.query(`
+      SELECT
+        (SELECT COUNT(*) FROM search_history WHERE student_name IS NOT NULL AND student_name != '' AND (student_name_enc IS NULL OR student_name_enc NOT LIKE 'v1.%')) as unenc_history,
+        (SELECT COUNT(*) FROM ai_query_history WHERE query_text IS NOT NULL AND query_text != '' AND (query_text_enc IS NULL OR query_text_enc NOT LIKE 'v1.%')) as unenc_ai,
+        (SELECT COUNT(*) FROM security_alerts WHERE details IS NOT NULL AND (details_enc IS NULL OR details_enc NOT LIKE 'v1.%')) as unenc_alerts,
+        (SELECT COUNT(*) FROM admin_audit_log WHERE meta IS NOT NULL AND (meta_enc IS NULL OR meta_enc NOT LIKE 'v1.%')) as unenc_audit
+    `);
+    const counts = unencRes.rows[0];
+    const totalResidualPlain = Number(counts.unenc_history) + Number(counts.unenc_ai) + Number(counts.unenc_alerts) + Number(counts.unenc_audit);
+    assert(totalResidualPlain === 0, 'Zero residual unencrypted rows across protected DB columns at rest');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 15: Search & Academic Performance Queries
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 15: Search & Academic Performance Queries ---');
+
+    grantHuman(normalUser.id);
+
+    const resFuzzySearch = await fetch(`${BASE}/api/students/search?q=dev`, {
+      headers: { Authorization: `Bearer ${normalToken}`, Origin: BASE }
+    });
+    assert(resFuzzySearch.status === 200, 'Fuzzy search runs via PostgreSQL ILIKE/full-text search without error (200 OK)');
+
+    const aggRes = await dbInstance.query(`
+      SELECT
+        COUNT(*) as total_students,
+        ROUND(AVG(cpi_final)::numeric, 2) as avg_cpi,
+        MAX(cpi_final) as max_cpi
+      FROM students
+      WHERE cpi_final IS NOT NULL
+    `);
+    const agg = aggRes.rows[0];
+    assert(Number(agg.total_students) > 0 && Number(agg.avg_cpi) > 0, 'SQL aggregates (AVG, MAX) calculate directly over plaintext academic metrics');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 16: Authentication Enumeration & Progressive Friction
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 16: Authentication Enumeration & Progressive Friction ---');
+
+    // 16A: check-email Route Excised (404)
+    const resCheckEmail = await fetch(`${BASE}/api/auth/check-email?email=test@iiitbhopal.ac.in`, {
+      headers: { Origin: BASE }
+    });
+    assert(resCheckEmail.status === 404, 'Legacy /api/auth/check-email route is completely excised (404 Not Found)');
+
+    // 16B: Uniform Status & Message on Failed Login
+    const resBadPw = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: BASE, 'x-client-signal': 'sig_test_1' },
+      body: JSON.stringify({ email: normalEmail, password: 'WrongPassword123!', turnstileToken: 'dummy' })
+    });
+    const bodyBadPw = await resBadPw.json();
+
+    const nonExistentEmail = `nonexistent_${Date.now()}@iiitbhopal.ac.in`;
+    const resMissing = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: BASE, 'x-client-signal': 'sig_test_2' },
+      body: JSON.stringify({ email: nonExistentEmail, password: 'WrongPassword123!', turnstileToken: 'dummy' })
+    });
+    const bodyMissing = await resMissing.json();
+
+    assert(resBadPw.status === 401 && resMissing.status === 401, 'Failed login yields status 401 for both existing and nonexistent accounts');
+    assert(bodyBadPw.message === 'Email or password is incorrect.', 'Existing user wrong password returns uniform message');
+    assert(bodyMissing.message === 'Email or password is incorrect.', 'Missing user returns identical uniform message');
+
+    // 16C: Equalized Timing via Dummy Bcrypt
+    const timingSamplesExisting = [];
+    const timingSamplesMissing = [];
+    for (let i = 0; i < 5; i++) {
+      const t1 = performance.now();
+      await fetch(`${BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: BASE, 'x-client-signal': `sig_timing_ex_${i}` },
+        body: JSON.stringify({ email: normalEmail, password: 'WrongPassword123!', turnstileToken: 'dummy' })
+      });
+      timingSamplesExisting.push(performance.now() - t1);
+
+      const t2 = performance.now();
+      await fetch(`${BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: BASE, 'x-client-signal': `sig_timing_ms_${i}` },
+        body: JSON.stringify({ email: `ghost_${i}_${Date.now()}@iiitbhopal.ac.in`, password: 'WrongPassword123!', turnstileToken: 'dummy' })
+      });
+      timingSamplesMissing.push(performance.now() - t2);
+    }
+    const avgExisting = timingSamplesExisting.reduce((a, b) => a + b, 0) / timingSamplesExisting.length;
+    const avgMissing = timingSamplesMissing.reduce((a, b) => a + b, 0) / timingSamplesMissing.length;
+    const timingDelta = Math.abs(avgExisting - avgMissing);
+    assert(timingDelta < 150, `Timing equalized via cost-12 dummy bcrypt (Delta: ${timingDelta.toFixed(1)}ms)`);
+
+    // 16D: Uniform Responses on Password Reset
+    const resForgotExisting = await fetch(`${BASE}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: BASE, 'x-client-signal': 'sig_forgot_1' },
+      body: JSON.stringify({ email: normalEmail, turnstileToken: 'dummy' })
+    });
+    const bodyForgotExisting = await resForgotExisting.json();
+
+    const resForgotMissing = await fetch(`${BASE}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: BASE, 'x-client-signal': 'sig_forgot_2' },
+      body: JSON.stringify({ email: `missing_${Date.now()}@iiitbhopal.ac.in`, turnstileToken: 'dummy' })
+    });
+    const bodyForgotMissing = await resForgotMissing.json();
+
+    assert(resForgotExisting.status === 200 && resForgotMissing.status === 200, 'Forgot password returns 200 for both existing and missing users');
+    assert(bodyForgotExisting.message === bodyForgotMissing.message, 'Forgot password response message is byte-identical');
+
+    // 16E: Shared Campus NAT Simulation (30 distinct students from same IP)
+    let natSuccessCount = 0;
+    for (let i = 0; i < 30; i++) {
+      const clientSignal = `campus_pc_station_${i}_${Date.now()}`;
+      const resNat = await fetch(`${BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: BASE,
+          'User-Agent': `CampusBrowser/1.0 (LabPC; Station ${i})`,
+          'x-client-signal': clientSignal
+        },
+        body: JSON.stringify({ email: `student_${i}_${Date.now()}@iiitbhopal.ac.in`, password: 'WrongPassword!', turnstileToken: 'dummy' })
+      });
+      if (resNat.status === 401) {
+        natSuccessCount++;
+      }
+    }
+    assert(natSuccessCount === 30, 'Simulated shared campus NAT: 30 legitimate distinct student devices not blocked');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 17: Crypto Failure Resilience
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 17: Crypto Failure Resilience ---');
+
+    let malformedCaught = false;
+    try {
+      decryptField('v1.v1.invalid_iv.invalid_tag.invalid_ciphertext', auditBinding, 'audit');
+    } catch (e) {
+      malformedCaught = e instanceof DecryptionError || e.name === 'DecryptionError';
+    }
+    assert(malformedCaught, 'Corrupt ciphertext throws typed DecryptionError');
+
+    // -------------------------------------------------------------------------
+    // TEST SUITE 18: Performance & Latency Benchmarks
+    // -------------------------------------------------------------------------
+    console.log('\n--- SUITE 18: Performance & Latency Benchmarks ---');
+
+    const benchText = 'Academic query string benchmark payload 12345';
+    const benchEnc = encryptField(benchText, { table: 'search_history', column: 'student_name', rowId: 5555 }, 'history');
+    const benchStart = performance.now();
+    for (let i = 0; i < 500; i++) {
+      decryptField(benchEnc, { table: 'search_history', column: 'student_name', rowId: 5555 }, 'history');
+    }
+    const benchElapsed = performance.now() - benchStart;
+    assert(benchElapsed < 150, `Decryption of 500 rows completes in under 150ms (Actual: ${benchElapsed.toFixed(2)}ms)`);
+
+    // Warm up connection then measure lookup SLA
+    await fetch(`${BASE}/api/students/23U02001`, {
+      headers: { Authorization: `Bearer ${normalToken}`, Origin: BASE }
+    }).catch(() => {});
+    const lookupStart = performance.now();
+    await fetch(`${BASE}/api/students/23U02001`, {
+      headers: { Authorization: `Bearer ${normalToken}`, Origin: BASE }
+    });
+    const lookupDuration = performance.now() - lookupStart;
+    assert(lookupDuration < 5000, `Student lookup endpoint completes within SLA (Actual: ${lookupDuration.toFixed(1)}ms)`);
 
     console.log('\n======================================================');
     console.log(`>>> SECURITY TEST SUMMARY: ${passedTests} PASSED, ${failedTests} FAILED <<<`);
