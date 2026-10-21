@@ -248,10 +248,29 @@ export default function Login({ onAuthSuccess }) {
               />
             </div>
 
+            <div className="flex justify-center my-2">
+              <Turnstile
+                ref={widgetRef}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
+                options={{ action: 'login', theme: 'dark', appearance: 'interaction-only' }}
+                onSuccess={(t) => {
+                  setToken(t);
+                  if (tokenResolverRef.current) tokenResolverRef.current(t);
+                }}
+                onError={(err) => {
+                  console.warn('[Turnstile login]', err);
+                }}
+                onExpire={() => {
+                  setToken(null);
+                  widgetRef.current?.reset();
+                }}
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full mt-4 glitch"
+              className="btn-primary w-full mt-2 glitch"
               data-corruptible="true"
               data-text={loading ? 'AUTHENTICATING...' : 'SIGN IN >>'}
             >
@@ -259,43 +278,23 @@ export default function Login({ onAuthSuccess }) {
             </button>
           </form>
 
-          {/* Hidden Background Turnstiles */}
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'fixed',
-              left: '-9999px',
-              top: '0px',
-              width: '300px',
-              height: '65px',
-              opacity: 0,
-              pointerEvents: 'none',
-              zIndex: -100,
-            }}
-          >
-            <Turnstile
-              ref={widgetRef}
-              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-              options={{ action: 'login', theme: 'dark' }}
-              onSuccess={(t) => {
-                setToken(t);
-                if (tokenResolverRef.current) tokenResolverRef.current(t);
-              }}
-              onExpire={() => setToken(null)}
-            />
-            {googleEnabled && (
+          {googleEnabled && (
+            <div className="flex justify-center my-1">
               <Turnstile
                 ref={googleWidgetRef}
                 siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-                options={{ action: 'google', theme: 'dark' }}
+                options={{ action: 'google', theme: 'dark', appearance: 'interaction-only' }}
                 onSuccess={(t) => {
                   setGoogleToken(t);
                   if (googleTokenResolverRef.current) googleTokenResolverRef.current(t);
                 }}
-                onExpire={() => setGoogleToken(null)}
+                onExpire={() => {
+                  setGoogleToken(null);
+                  googleWidgetRef.current?.reset();
+                }}
               />
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Footer links */}
           <div className="mt-8 flex justify-between items-center font-terminal text-xs" style={{ color: 'var(--bone-35)' }}>

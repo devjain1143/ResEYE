@@ -60,36 +60,20 @@ export default function CaptchaModal() {
         )}
 
         <div className="my-6 flex flex-col items-center justify-center p-4 border border-white/20 bg-white/5 text-center">
-          <div className="text-xs font-mono tracking-widest text-white/80 animate-pulse">
-            [ VERIFYING OPERATOR CLEARANCE IN BACKGROUND... ]
-          </div>
-          <div className="mt-2 text-[10px] text-white/40 font-mono">
-            ARCHIVE ACCESS HANDSHAKE IN PROGRESS
-          </div>
-        </div>
-
-        {/* Hidden Background Turnstile */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            left: '-9999px',
-            top: '0',
-            width: '300px',
-            height: '65px',
-            opacity: 0,
-            pointerEvents: 'none',
-            zIndex: -100,
-          }}
-        >
           <Turnstile
             ref={widgetRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-            options={{ action: 'search', theme: 'dark' }}
+            options={{ action: 'search', theme: 'dark', appearance: 'interaction-only' }}
             onSuccess={handleVerify}
-            onError={() => setError('Verification challenge failed.')}
+            onError={(err) => setError(`Verification failed (${err || 'challenge rejected'}).`)}
             onExpire={() => widgetRef.current?.reset()}
           />
+          <div className="text-xs font-mono tracking-widest text-white/80 animate-pulse mt-2">
+            [ VERIFYING OPERATOR CLEARANCE IN BACKGROUND... ]
+          </div>
+          <div className="mt-1 text-[10px] text-white/40 font-mono">
+            ARCHIVE ACCESS HANDSHAKE IN PROGRESS
+          </div>
         </div>
 
         {loading && (

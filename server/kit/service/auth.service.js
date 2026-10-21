@@ -165,8 +165,9 @@ export const authService = {
       }
     });
 
+    const authTime = Math.floor(Date.now() / 1000);
     const accessToken = jwt.sign(
-      { userId: user.id, sessionId: session.id, role: user.role, status: user.status },
+      { userId: user.id, sessionId: session.id, role: user.role, status: user.status, authTime },
       JWT_ACCESS_SECRET,
       { expiresIn: JWT_ACCESS_EXPIRES_IN }
     );
@@ -243,10 +244,8 @@ export const authService = {
           data: { isEmailVerified: true, status: 'ACTIVE' }
         });
       } else {
-        const err = new Error('Institutional email not verified. Please click the verification link sent to your inbox.');
-        err.status = 403;
-        err.code = 'EMAIL_NOT_VERIFIED';
-        err.email = user.email;
+        const err = new Error('Email or password is incorrect.');
+        err.status = 401;
         throw err;
       }
     }
@@ -322,12 +321,14 @@ export const authService = {
       }
     });
 
+    const authTime = Math.floor(session.createdAt.getTime() / 1000);
     const accessToken = jwt.sign(
       {
         userId: session.user.id,
         sessionId: session.id,
         role: session.user.role,
-        status: session.user.status
+        status: session.user.status,
+        authTime
       },
       JWT_ACCESS_SECRET,
       { expiresIn: JWT_ACCESS_EXPIRES_IN }

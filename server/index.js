@@ -19,6 +19,7 @@ import meRouter from './routes/me.js';
 import announcementsRouter from './routes/announcements.js';
 import favoritesRouter from './routes/favorites.js';
 import adminRouter from './routes/admin/index.js';
+import { authenticate } from './middleware/authenticate.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 import { requestLogger } from './middleware/logger.js';
@@ -73,7 +74,11 @@ app.use('/api/favorites', favoritesRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/me', meRouter);
 app.use('/api/announcements', announcementsRouter);
-app.use('/api/admin', adminRouter);
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'ADMIN') return res.status(403).json({ success: false, message: 'Forbidden' });
+  next();
+}
+app.use('/api/admin', authenticate, requireAdmin, adminRouter);
 
 // SEO & Crawl Discovery: robots.txt & sitemap.xml
 app.get('/robots.txt', (req, res) => {

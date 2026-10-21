@@ -3,14 +3,17 @@ import { authService } from '../service/auth.service.js';
 import { normalizeInstitutionEmail } from '../config/domain.js';
 import { alertService } from '../../services/alertService.js';
 
-const COOKIE_NAME = 'refreshToken';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-  path: '/api/auth'
-};
+function getCookieOptions(req) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const isHttps = req?.secure || req?.headers?.['x-forwarded-proto'] === 'https';
+  return {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd || isHttps,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/api/auth'
+  };
+}
 
 // Progressive friction tracker: isolated by composite client fingerprint (IP + UA/signal)
 // Prevents shared campus NAT from locking out all legitimate institute students
@@ -195,7 +198,9 @@ export const authController = {
         ip: req.ip
       });
 
-      res.cookie(COOKIE_NAME, result.refreshToken, COOKIE_OPTIONS);
+      const cookieOpts = getCookieOptions(req);
+      res.cookie('refresh_token', result.refreshToken, cookieOpts);
+      res.cookie('refreshToken', result.refreshToken, cookieOpts);
       res.json({
         success: true,
         accessToken: result.accessToken,
@@ -208,20 +213,23 @@ export const authController = {
 
   async refresh(req, res, next) {
     try {
-      const token = req.cookies?.[COOKIE_NAME];
+      const token = req.cookies?.refresh_token || req.cookies?.refreshToken;
       if (!token) {
         return res.status(401).json({ success: false, message: 'No active session token.' });
       }
 
       const result = await authService.refreshToken(token, req.get('user-agent'), req.ip);
-      res.cookie(COOKIE_NAME, result.refreshToken, COOKIE_OPTIONS);
+      const cookieOpts = getCookieOptions(req);
+      res.cookie('refresh_token', result.refreshToken, cookieOpts);
+      res.cookie('refreshToken', result.refreshToken, cookieOpts);
       res.json({
         success: true,
         accessToken: result.accessToken,
         user: result.user
       });
     } catch (err) {
-      res.clearCookie(COOKIE_NAME, { path: '/api/auth' });
+      res.clearCookie('refresh_token', { path: '/api/auth' });
+      res.clearCookie('refreshToken', { path: '/api/auth' });
       next(err);
     }
   },
@@ -231,7 +239,8 @@ export const authController = {
       if (req.sessionId) {
         await authService.logout(req.sessionId);
       }
-      res.clearCookie(COOKIE_NAME, { path: '/api/auth' });
+      res.clearCookie('refresh_token', { path: '/api/auth' });
+      res.clearCookie('refreshToken', { path: '/api/auth' });
       res.json({ success: true, message: 'Session terminated.' });
     } catch (err) {
       next(err);

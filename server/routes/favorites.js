@@ -4,6 +4,7 @@ import { originCheck } from '../middleware/originCheck.js';
 import { getDb } from '../core/db.js';
 import { getByScholarNo, isSpecialScholar } from '../core/query.js';
 import { getRegistrationByScholarNo } from '../core/registration.js';
+import { serializeStudent } from '../services/studentService.js';
 import { alertService } from '../services/alertService.js';
 import { audit } from '../services/auditService.js';
 
@@ -41,7 +42,7 @@ function formatStudentPayload(student, userRole) {
     }
   }
 
-  return {
+  return serializeStudent({
     scholarNo: student.scholar_no,
     name: student.name,
     degree: student.degree || 'B.Tech',
@@ -50,7 +51,7 @@ function formatStudentPayload(student, userRole) {
     cpi: student.cpi_final !== null && student.cpi_final !== undefined ? parseFloat(student.cpi_final) : null,
     registration: registrationData,
     isPinned: true
-  };
+  }, { role: userRole });
 }
 
 // GET /api/favorites - List all pinned tapes for authenticated user

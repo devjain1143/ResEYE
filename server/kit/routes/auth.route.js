@@ -89,13 +89,17 @@ router.get(
       if (err || !result) {
         return res.redirect('/login?error=google');
       }
-      res.cookie('refreshToken', result.refreshToken, {
+      const isProd = process.env.NODE_ENV === 'production';
+      const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
+      const cookieOpts = {
         httpOnly: true,
         sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProd || isHttps,
         maxAge: 7 * 24 * 60 * 60 * 1000,
         path: '/api/auth'
-      });
+      };
+      res.cookie('refresh_token', result.refreshToken, cookieOpts);
+      res.cookie('refreshToken', result.refreshToken, cookieOpts);
       return res.redirect('/auth/success');
     })(req, res, next);
   }

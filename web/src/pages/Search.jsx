@@ -80,6 +80,7 @@ export default function Search({ user }) {
   useEffect(() => {
     fetchAiQuota();
     fetchPinnedIds();
+    triggerBackgroundCaptcha();
   }, [activeTab]);
 
   const handleStudentSearch = async (e, targetPage = 1, customFilters = null) => {
@@ -635,34 +636,25 @@ export default function Search({ user }) {
         </div>
       )}
 
-      {/* Hidden Background Turnstile Verification Container */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'fixed',
-          left: '-9999px',
-          top: '0px',
-          width: '300px',
-          height: '65px',
-          opacity: 0,
-          pointerEvents: 'none',
-          zIndex: -100,
-        }}
-      >
-        {captchaActive && !captchaVerified && (
+      {/* Background Turnstile Verification Container */}
+      {captchaActive && !captchaVerified && (
+        <div className="flex justify-center my-2">
           <Turnstile
             ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-            options={{ action: 'search', theme: 'dark' }}
+            options={{ action: 'search', theme: 'dark', appearance: 'interaction-only' }}
             onSuccess={handleTurnstileSuccess}
-            onError={() => turnstileRef.current?.reset()}
+            onError={(err) => {
+              console.warn('[Turnstile] Challenge error:', err);
+              turnstileRef.current?.reset();
+            }}
             onExpire={() => {
               setCaptchaVerified(false);
               turnstileRef.current?.reset();
             }}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,12 @@
 import { getByScholarNo, searchUnifiedStudents, logSearch, isSpecialScholar, getHistoryByScholarNo, extractFailedSubjects } from '../core/query.js';
 import { getDb } from '../core/db.js';
 import { getRegistrationByScholarNo } from '../core/registration.js';
+
+export function serializeStudent(student, user) {
+  if (!student) return null;
+  const { registration, ...publicFields } = student;
+  return user?.role === 'ADMIN' ? { ...publicFields, registration } : publicFields;
+}
 import { settingsService } from './settingsService.js';
 import { alertService } from './alertService.js';
 
@@ -186,7 +192,7 @@ export const studentService = {
       }
     }
 
-    return {
+    return serializeStudent({
       scholarNo: student.scholar_no,
       name: student.name,
       degree: student.degree || 'B.Tech',
@@ -194,7 +200,7 @@ export const studentService = {
       semesters,
       cpi: student.cpi_final !== null && student.cpi_final !== undefined ? parseFloat(student.cpi_final) : null,
       registration: registrationData
-    };
+    }, user);
   },
 
   async search(queryText, page = 1, user, filters = {}) {

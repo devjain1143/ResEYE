@@ -1,27 +1,13 @@
 import crypto from 'crypto';
 import { getDb } from '../core/db.js';
 import prisma from '../kit/lib/prisma.js';
-
-function escapeCsvCell(val) {
-  if (val === null || val === undefined) return '';
-  let str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-
-  // Guard against CSV formula injection
-  if (/^[=+\-@\t\r]/.test(str)) {
-    str = `'${str}`;
-  }
-
-  if (/[",\n\r]/.test(str)) {
-    str = `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
+import { csvCell } from '../utils/csv.js';
 
 function toCsv(rows) {
   if (!rows || rows.length === 0) return '';
   const headers = Object.keys(rows[0]);
-  const headerRow = headers.map(escapeCsvCell).join(',');
-  const dataRows = rows.map(row => headers.map(h => escapeCsvCell(row[h])).join(','));
+  const headerRow = headers.map(csvCell).join(',');
+  const dataRows = rows.map(row => headers.map(h => csvCell(row[h])).join(','));
   return [headerRow, ...dataRows].join('\r\n');
 }
 

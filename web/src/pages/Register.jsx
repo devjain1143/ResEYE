@@ -177,10 +177,29 @@ export default function Register() {
               />
             </div>
 
+            <div className="flex justify-center my-2">
+              <Turnstile
+                ref={widgetRef}
+                siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
+                options={{ action: 'register', theme: 'dark', appearance: 'interaction-only' }}
+                onSuccess={(t) => {
+                  setToken(t);
+                  if (tokenResolverRef.current) tokenResolverRef.current(t);
+                }}
+                onError={(err) => {
+                  console.warn('[Turnstile register]', err);
+                }}
+                onExpire={() => {
+                  setToken(null);
+                  widgetRef.current?.reset();
+                }}
+              />
+            </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full mt-6"
+              className="btn-primary w-full mt-2"
             >
               {loading ? 'TRANSMITTING...' : 'ENROLL CREDENTIALS >>'}
             </button>
@@ -233,32 +252,6 @@ export default function Register() {
             </div>
           </div>
         )}
-
-        {/* Hidden Background Turnstile */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'fixed',
-            left: '-9999px',
-            top: '0px',
-            width: '300px',
-            height: '65px',
-            opacity: 0,
-            pointerEvents: 'none',
-            zIndex: -100,
-          }}
-        >
-          <Turnstile
-            ref={widgetRef}
-            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-            options={{ action: 'register', theme: 'dark' }}
-            onSuccess={(t) => {
-              setToken(t);
-              if (tokenResolverRef.current) tokenResolverRef.current(t);
-            }}
-            onExpire={() => setToken(null)}
-          />
-        </div>
 
         <div className="mt-8 font-terminal text-xs" style={{ color: 'var(--bone-35)' }}>
           <Link to="/login" className="btn-secondary text-xs" style={{ padding: '2px 0' }}>

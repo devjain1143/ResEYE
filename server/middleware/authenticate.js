@@ -59,6 +59,7 @@ export async function authenticate(req, res, next) {
   }
 
   req.user = session.user;
+  req.user.authTime = payload.authTime || Math.floor(session.createdAt.getTime() / 1000);
   req.sessionId = session.id;
   next();
 }

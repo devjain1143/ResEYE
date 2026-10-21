@@ -19,6 +19,8 @@ const MetricEnum = z.enum(['spi', 'cpi']);
 const ConfidenceEnum = z.enum(['high', 'low']);
 
 const SemesterSchema = z.number().int().min(1).max(8);
+const SafeBatchSchema = z.string().regex(/^[a-zA-Z0-9\s\-_./]+$/, 'Invalid batch identifier').max(64).optional();
+const SafeScholarPrefixSchema = z.string().regex(/^[a-zA-Z0-9]+$/, 'Invalid scholar prefix').max(10).optional();
 
 const LookupStudentParams = z.object({
   identifier: z.string().optional(),
@@ -31,8 +33,8 @@ const LookupStudentParams = z.object({
 const TopScorerParams = z.object({
   degree: DegreeEnum.optional(),
   specialization: SpecializationEnum.optional(),
-  scholar_no_prefix: z.string().optional(),
-  batch: z.string().optional(),
+  scholar_no_prefix: SafeScholarPrefixSchema,
+  batch: SafeBatchSchema,
   metric: MetricEnum,
   semester: SemesterSchema.optional(),
   position: z.enum(['highest', 'lowest']).optional().default('highest'),
@@ -49,8 +51,8 @@ const TopScorerParams = z.object({
 const AverageMetricParams = z.object({
   degree: DegreeEnum.optional(),
   specialization: SpecializationEnum.optional(),
-  scholar_no_prefix: z.string().optional(),
-  batch: z.string().optional(),
+  scholar_no_prefix: SafeScholarPrefixSchema,
+  batch: SafeBatchSchema,
   metric: MetricEnum,
   semester: SemesterSchema.optional()
 }).strict().superRefine((val, ctx) => {
@@ -65,16 +67,16 @@ const AverageMetricParams = z.object({
 const ResultCountParams = z.object({
   degree: DegreeEnum.optional(),
   specialization: SpecializationEnum.optional(),
-  scholar_no_prefix: z.string().optional(),
-  batch: z.string().optional(),
+  scholar_no_prefix: SafeScholarPrefixSchema,
+  batch: SafeBatchSchema,
   semester: SemesterSchema
 }).strict();
 
 const BatchRosterParams = z.object({
   degree: DegreeEnum.optional(),
   specialization: SpecializationEnum.optional(),
-  scholar_no_prefix: z.string().optional(),
-  batch: z.string().optional()
+  scholar_no_prefix: SafeScholarPrefixSchema,
+  batch: SafeBatchSchema
 }).strict();
 
 const RankParams = z.object({
@@ -83,8 +85,8 @@ const RankParams = z.object({
   scholar_no: z.string().optional(),
   degree: DegreeEnum.optional(),
   specialization: SpecializationEnum.optional(),
-  scholar_no_prefix: z.string().optional(),
-  batch: z.string().optional(),
+  scholar_no_prefix: SafeScholarPrefixSchema,
+  batch: SafeBatchSchema,
   semester: SemesterSchema.optional(),
   metric: MetricEnum
 }).strict().superRefine((val, ctx) => {

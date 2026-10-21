@@ -204,10 +204,38 @@ export async function run({ query, user }) {
 }
 
 export async function handleDebugIntent(rawJson) {
-  const parsed = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson;
-  const validation = validateIntent(parsed);
+  let parsed;
+  try {
+    parsed = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson;
+  } catch (err) {
+    const error = new Error(`Malformed JSON: ${err.message}`);
+    error.status = 400;
+    throw error;
+  }
+
+  const normalized = parsed.params ? parsed : {
+    intent: parsed.intent,
+    confidence: parsed.confidence || 'high',
+    params: {
+      degree: parsed.degree,
+      specialization: parsed.specialization,
+      scholar_no_prefix: parsed.scholar_no_prefix,
+      batch: parsed.batch,
+      metric: parsed.metric || (parsed.semester ? 'spi' : 'cpi'),
+      semester: parsed.semester,
+      position: parsed.position,
+      limit: parsed.limit,
+      identifier: parsed.identifier,
+      name: parsed.name,
+      scholar_no: parsed.scholar_no
+    }
+  };
+
+  const validation = validateIntent(normalized);
   if (!validation.valid) {
-    throw new Error(`Validation failed: ${validation.error}`);
+    const error = new Error(`Validation failed: ${validation.error}`);
+    error.status = 400;
+    throw error;
   }
   const executed = await executeIntent(validation.data);
   const formatted = formatResponse(executed);

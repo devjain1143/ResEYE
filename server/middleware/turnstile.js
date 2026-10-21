@@ -28,11 +28,15 @@ export function requireTurnstile(expectedAction) {
     }
 
     try {
-      const form = new URLSearchParams({
+      const formParams = {
         secret,
-        response: token,
-        remoteip: req.ip,
-      });
+        response: token
+      };
+      const clientIp = req.ip || req.headers['x-forwarded-for']?.split(',')[0]?.trim();
+      if (clientIp && !clientIp.startsWith('127.') && clientIp !== '::1' && !clientIp.startsWith('10.') && !clientIp.startsWith('192.168.')) {
+        formParams.remoteip = clientIp;
+      }
+      const form = new URLSearchParams(formParams);
 
       const r = await fetch(VERIFY_URL, {
         method: 'POST',
