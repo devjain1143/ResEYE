@@ -34,6 +34,8 @@ export function errorHandler(err, req, res, next) {
   res.status(status).json({
     success: false,
     message,
+    ...(err.code && { code: err.code }),
+    ...(err.email && { email: err.email }),
     ...(status >= 500 && { code: 'INTERNAL_ERROR' })
   });
 }

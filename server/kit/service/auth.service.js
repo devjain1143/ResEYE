@@ -244,8 +244,10 @@ export const authService = {
           data: { isEmailVerified: true, status: 'ACTIVE' }
         });
       } else {
-        const err = new Error('Email or password is incorrect.');
-        err.status = 401;
+        const err = new Error(`Verification mail has been sent to ${user.email}. Please check your inbox and junk folder.`);
+        err.status = 403;
+        err.code = 'EMAIL_NOT_VERIFIED';
+        err.email = user.email;
         throw err;
       }
     }

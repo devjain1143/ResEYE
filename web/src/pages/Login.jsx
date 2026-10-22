@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { api, setAccessToken } from '../api';
 import AsciiEye from '../components/AsciiEye';
@@ -15,6 +15,7 @@ export default function Login({ onAuthSuccess }) {
   const [token, setToken] = useState(null);
   const [googleToken, setGoogleToken] = useState(null);
   const [error, setError] = useState('');
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
@@ -30,6 +31,7 @@ export default function Login({ onAuthSuccess }) {
   const tokenResolverRef = useRef(null);
   const googleTokenResolverRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -40,6 +42,21 @@ export default function Login({ onAuthSuccess }) {
       setError('FAULT: GOOGLE WORKSPACE AUTHENTICATION FAILED.');
     }
 
+    const stateEmail = location.state?.unverifiedEmail || location.state?.email;
+    const paramEmail = searchParams.get('email');
+    if (
+      location.state?.unverified ||
+      location.state?.unverifiedEmail ||
+      searchParams.get('unverified') === 'true' ||
+      searchParams.get('registered') === 'true'
+    ) {
+      const target = stateEmail || paramEmail;
+      if (target) {
+        setUnverifiedEmail(target);
+        setIdentifier(target);
+      }
+    }
+
     api('/auth/config')
       .then((res) => {
         if (res && res.googleEnabled) {
@@ -47,7 +64,7 @@ export default function Login({ onAuthSuccess }) {
         }
       })
       .catch(() => {});
-  }, [searchParams]);
+  }, [searchParams, location.state]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -79,7 +96,17 @@ export default function Login({ onAuthSuccess }) {
       setAccessToken(res.accessToken);
       onAuthSuccess(res.user);
     } catch (err) {
-      setError(`FAULT: ${err.message || 'EMAIL OR PASSWORD IS INCORRECT.'}`);
+      if (
+        err.code === 'EMAIL_NOT_VERIFIED' ||
+        (err.message && (err.message.toLowerCase().includes('not verified') || err.message.toLowerCase().includes('verification mail') || err.message.toLowerCase().includes('junk')))
+      ) {
+        const targetEmail = err.email || err.data?.email || (identifier.includes('@') ? identifier.trim() : '');
+        setUnverifiedEmail(targetEmail || identifier.trim() || 'your email');
+        setError('');
+      } else {
+        setError(`FAULT: ${err.message || 'EMAIL OR PASSWORD IS INCORRECT.'}`);
+        setUnverifiedEmail('');
+      }
       setStare(true);
       widgetRef.current?.reset();
       setToken(null);
@@ -189,14 +216,72 @@ export default function Login({ onAuthSuccess }) {
             INSERT CREDENTIALS TO ACCESS THE ARCHIVE
           </div>
 
-          {error && (
+          {unverifiedEmail ? (
+            <div className="mb-6 p-4 border border-white/20 bg-white/5 space-y-3 font-typewriter text-xs text-white/90">
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-sm font-bold text-white flex items-center gap-1.5 font-terminal tracking-wider">
+                  <span className="text-amber-400 select-none">[!]</span>
+                  <span>VERIFICATION PENDING</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUnverifiedEmail('')}
+                  className="text-white/40 hover:text-white font-terminal text-xs"
+                  aria-label="Dismiss notice"
+                >
+                  [X]
+                </button>
+              </div>
+
+              <p className="leading-relaxed text-sm">
+                Verification mail has been sent to{' '}
+                <strong className="text-cyan-300 font-mono break-all font-semibold">
+                  {unverifiedEmail}
+                </strong>
+                . Please check your inbox and check your junk folder.
+              </p>
+
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <p className="text-white/70 text-xs">
+                  If you find an issue, contact us:
+                </p>
+                <div className="flex flex-wrap gap-2.5 pt-1 font-terminal">
+                  <a
+                    href="https://www.instagram.com/bru_fu02"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-sm font-bold transition-all shadow select-none"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                    <span>Instagram</span>
+                  </a>
+
+                  <a
+                    href="https://t.me/bru_fu02"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-white text-black hover:bg-neutral-200 text-sm font-bold transition-all shadow select-none"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <svg className="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.832.969z"/>
+                    </svg>
+                    <span>Telegram</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : error ? (
             <div
               className="mb-4 font-typewriter text-sm py-2 px-3"
               style={{ background: '#fff', color: '#000' }}
             >
               {error}
             </div>
-          )}
+          ) : null}
 
           {/* Google OAuth */}
           {googleEnabled && (
