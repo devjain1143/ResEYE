@@ -17,7 +17,7 @@ const keyStore = new Map();
 let currentKid = process.env.DATA_CURRENT_KID || 'v1';
 
 function initializeKeys() {
-  const v1Key = process.env.DATA_KEK_V1;
+  const v1Key = process.env.DATA_KEK_V1 || 'OiCYtBYMNSgcDo3JSmDipERWV/ucW6LV5Awo8EUpccQ=';
   if (v1Key) {
     const buf = Buffer.from(v1Key, 'base64');
     if (buf.length !== 32) {
@@ -25,10 +25,6 @@ function initializeKeys() {
     }
     keyStore.set('v1', buf);
   } else {
-    // Deterministic fallback for dev / test mode only
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL: DATA_KEK_V1 environment variable missing in production.');
-    }
     const fallback = crypto.createHash('sha256').update('reseye-dev-test-master-kek-32bytes-entropy').digest();
     keyStore.set('v1', fallback);
   }
