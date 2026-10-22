@@ -131,8 +131,20 @@ export default function SearchHistory() {
                   <td className="p-3 text-white/90 font-serif">
                     {row.student_name || '--'}
                   </td>
-                  <td className="p-3 text-white/50">
-                    {row.web_user_id || row.user_id || 'ANONYMOUS'}
+                  <td className="p-3">
+                    {row.searcher_name && row.searcher_name !== 'User' ? (
+                      <div>
+                        <span className="text-white font-bold">{row.searcher_name}</span>
+                        {row.searcher_scholar_no && (
+                          <span className="text-white/50 ml-1.5 font-mono">({row.searcher_scholar_no})</span>
+                        )}
+                        {row.username && row.username !== row.searcher_scholar_no && (
+                          <span className="text-white/30 text-[10px] block font-mono">@{row.username}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-white/50">{row.username || row.web_user_id || row.user_id || 'ANONYMOUS'}</span>
+                    )}
                   </td>
                 </tr>
               ))}

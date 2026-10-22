@@ -1,13 +1,18 @@
 import { getDb } from '../core/db.js';
 import { encryptField, decryptField, getEncryptionMode } from '../crypto/index.js';
+import { identifyUser, formatTelegramAlertMessage } from './identityService.js';
 
-export async function pushAdminTelegram(text) {
+export async function pushAdminTelegram(text, parseMode = 'HTML') {
   if (!process.env.TELEGRAM_ALERT_BOT_TOKEN || !process.env.TELEGRAM_ALERT_CHAT_ID) return;
   try {
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_ALERT_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: process.env.TELEGRAM_ALERT_CHAT_ID, text }),
+      body: JSON.stringify({
+        chat_id: process.env.TELEGRAM_ALERT_CHAT_ID,
+        text,
+        parse_mode: parseMode
+      }),
     });
   } catch (err) {
     console.error('[AlertService] Failed to push Telegram message:', err.message);
@@ -17,7 +22,31 @@ export async function pushAdminTelegram(text) {
 export const alertService = {
   async create(kind, webUserId, details = {}) {
     const db = getDb();
-    const detailsStr = typeof details === 'string' ? details : JSON.stringify(details);
+    
+    // Identify user from institutional email / scholar number in registration table
+    let enrichedDetails = details;
+    try {
+      const identity = await identifyUser(webUserId || details?.searcher || details?.user);
+      if (identity) {
+        enrichedDetails = {
+          ...details,
+          identifiedUser: {
+            realName: identity.realName,
+            scholarNo: identity.scholarNo,
+            fatherName: identity.fatherName,
+            category: identity.category,
+            phone: identity.phone,
+            instituteEmail: identity.email,
+            address: identity.address,
+            course: identity.course
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('[AlertService] Error enriching identity:', e.message);
+    }
+
+    const detailsStr = typeof enrichedDetails === 'string' ? enrichedDetails : JSON.stringify(enrichedDetails);
     const detailsEnc = encryptField(detailsStr, { table: 'security_alerts', column: 'details', rowId: 0 }, 'alerts');
     const mode = getEncryptionMode();
     const detailsPlain = mode === 'on' ? '{}' : detailsStr;
@@ -30,12 +59,13 @@ export const alertService = {
     );
 
     const alert = res.rows[0];
-    const alertOut = { ...alert, details };
+    const alertOut = { ...alert, details: enrichedDetails };
     delete alertOut.details_enc;
 
-    // Push optional alert notification to Telegram (redacted, no raw PII)
-    const notice = `ALERT: ${kind} detected for subject ${webUserId ? 'user_' + webUserId.slice(0, 6) : 'unauthenticated'}. Review surveillance tape.`;
-    pushAdminTelegram(notice).catch(() => {});
+    // Push identified alert notification to Telegram
+    formatTelegramAlertMessage(kind, webUserId, enrichedDetails)
+      .then((notice) => pushAdminTelegram(notice, 'HTML'))
+      .catch((err) => console.error('[AlertService] Failed to push Telegram message:', err.message));
 
     return alertOut;
   },

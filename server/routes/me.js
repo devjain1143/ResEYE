@@ -25,7 +25,8 @@ router.get('/history', async (req, res, next) => {
     const history = await getSearchHistory({
       webUserId: req.user.id,
       page,
-      pageSize: 20
+      pageSize: 20,
+      isAdmin: req.user.role === 'ADMIN'
     });
     res.json({ success: true, data: history });
   } catch (err) {

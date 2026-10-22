@@ -160,19 +160,65 @@ export default function Alerts() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono mb-3">
-                <div>
-                  <span className="text-white/50">OPERATOR ID: </span>
-                  <span className="text-white font-bold">{al.web_user_id || 'ANONYMOUS/UNKNOWN'}</span>
-                </div>
-                <div>
-                  <span className="text-white/50">TARGET SCHOLAR: </span>
-                  <span className="text-white font-bold">{al.scholar_no || 'BATCH_SWEEP'}</span>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono mb-3">
+                {al.details?.identifiedUser ? (
+                  <div className="md:col-span-2 bg-white/5 p-2.5 border border-white/10">
+                    <span className="text-white/40 block text-[10px] mb-1">OPERATOR IDENTIFIED FROM REGISTRATION:</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-white/40 block text-[10px]">NAME &amp; SCHOLAR NO:</span>
+                        <span className="text-white font-bold">{al.details.identifiedUser.realName}</span>
+                        <span className="text-white/60 ml-1">({al.details.identifiedUser.scholarNo || 'N/A'})</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[10px]">FATHER'S NAME:</span>
+                        <span className="text-white">{al.details.identifiedUser.fatherName || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[10px]">CONTACT NO:</span>
+                        <span className="text-white">{al.details.identifiedUser.phone || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[10px]">INSTITUTE EMAIL:</span>
+                        <span className="text-white">{al.details.identifiedUser.instituteEmail || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[10px]">CATEGORY:</span>
+                        <span className="text-white">{al.details.identifiedUser.category || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-white/40 block text-[10px]">RESIDENTIAL ADDRESS:</span>
+                        <span className="text-white truncate block">{al.details.identifiedUser.address || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="text-white/50">OPERATOR ID: </span>
+                    <span className="text-white font-bold">{al.web_user_id || 'ANONYMOUS/UNKNOWN'}</span>
+                  </div>
+                )}
+
+                {al.details?.student && (
+                  <div className="md:col-span-2 bg-white/5 p-2 border border-white/10">
+                    <span className="text-white/40 block text-[10px]">TARGET MONITORED SCHOLAR:</span>
+                    <span className="text-white font-bold">{al.details.student.name}</span>
+                    <span className="text-white/60 ml-2">({al.details.student.scholarNo})</span>
+                  </div>
+                )}
+
                 <div className="md:col-span-2">
-                  <span className="text-white/50">DETAILS: </span>
-                  <span className="text-white/80 font-serif">
-                    {typeof al.details === 'object' ? JSON.stringify(al.details) : al.details || '--'}
+                  <span className="text-white/50">INCIDENT DETAILS: </span>
+                  <span className="text-white/80 font-mono text-[11px]">
+                    {typeof al.details === 'object'
+                      ? JSON.stringify({
+                          kind: al.kind,
+                          reason: al.details.reason,
+                          at: al.details.at,
+                          queries: al.details.recentQueries,
+                          pastSearchesCount: al.details.timelineOfPastSearches?.length
+                        })
+                      : al.details || '--'}
                   </span>
                 </div>
               </div>

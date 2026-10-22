@@ -1,7 +1,21 @@
 import { getDb } from './db.js';
 import { getEmbedding } from './embeddings.js';
-import { searchRegistrationByName } from './registration.js';
+import { searchRegistrationByName, getRegistrationByScholarNo } from './registration.js';
+import { getRegistrationDetails } from '../services/identityService.js';
 import { encryptField, decryptField, getEncryptionMode } from '../crypto/index.js';
+
+function extractScholarNo(identifier) {
+  if (!identifier || typeof identifier !== 'string') return null;
+  const str = identifier.trim().toLowerCase();
+  const emailMatch = str.match(/^([a-z0-9._-]+)@(?:[a-z0-9.-]+\.)?iiitbhopal\.ac\.in$/);
+  if (emailMatch) {
+    const local = emailMatch[1].split('+')[0];
+    const match = local.match(/^(\d{2}[a-z0-9]+)$/i);
+    return match ? match[1].toUpperCase() : local.toUpperCase();
+  }
+  const directMatch = str.match(/^(\d{2}[a-z0-9]{5,8})$/i);
+  return directMatch ? directMatch[1].toUpperCase() : null;
+}
 
 export async function getByScholarNo(scholarNo) {
   if (!scholarNo) return null;
@@ -51,7 +65,7 @@ export async function searchUnifiedStudents(name, page = 1, limit = 10, isUserAd
   const cleanedName = (name || '').trim().toUpperCase();
   if (!cleanedName) return { results: [], total: 0 };
 
-  const conditions = ["UPPER(name) LIKE '%' || $1 || '%'"];
+  const conditions = ["(UPPER(name) LIKE '%' || $1 || '%' OR UPPER(scholar_no) LIKE '%' || $1 || '%')"];
   const params = [cleanedName];
 
   if (filters.degree && filters.degree.trim()) {
@@ -124,6 +138,39 @@ export async function searchUnifiedStudents(name, page = 1, limit = 10, isUserAd
   let extraRegs = [];
   if (isUserAdmin && (!filters.status && !filters.minCpi && !filters.degree && !filters.branch && !filters.batch)) {
     const regMatches = searchRegistrationByName(name, null);
+    const foundByScholar = getRegistrationByScholarNo(cleanedName);
+    if (foundByScholar && !regMatches.some(r => r.scholarNo === foundByScholar.scholarNo)) {
+      regMatches.push(foundByScholar);
+    }
+
+    // Query Neon DB student_registrations table for additional matches
+    try {
+      const dbRegRes = await db.query(
+        "SELECT scholar_no, candidate_name, course, father_name, category, contact_no, email, present_address " +
+        "FROM student_registrations " +
+        "WHERE UPPER(candidate_name) LIKE '%' || $1 || '%' OR UPPER(scholar_no) = $1 " +
+        "LIMIT 50",
+        [cleanedName]
+      );
+      for (const dr of dbRegRes.rows) {
+        if (!regMatches.some(r => r.scholarNo.toUpperCase() === dr.scholar_no.toUpperCase())) {
+          regMatches.push({
+            scholarNo: dr.scholar_no.toUpperCase(),
+            name: dr.candidate_name,
+            guardian: dr.father_name,
+            fatherName: dr.father_name,
+            category: dr.category,
+            course: dr.course,
+            phones: dr.contact_no ? [dr.contact_no] : [],
+            emails: dr.email ? [dr.email] : [],
+            addresses: dr.present_address ? [{ text: dr.present_address, semesters: [] }] : []
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Query] Error querying DB student_registrations:', e.message);
+    }
+
     if (regMatches.length > 0) {
       const scholarList = regMatches.map(r => r.scholarNo.toUpperCase());
       const dbExistingRes = await db.query(
@@ -137,11 +184,19 @@ export async function searchUnifiedStudents(name, page = 1, limit = 10, isUserAd
           scholar_no: r.scholarNo,
           name: r.name,
           degree: 'N/A',
-          specialization: 'N/A',
+          specialization: r.course || 'N/A',
           backlogs: [],
           hasBacklog: false,
           isRegistrationOnly: true,
-          regData: r
+          registration: {
+            name: r.name,
+            fatherName: r.fatherName || r.guardian || null,
+            guardian: r.guardian || r.fatherName || null,
+            category: r.category || null,
+            phones: r.phones || [],
+            emails: r.emails || [],
+            addresses: r.addresses || []
+          }
         }));
     }
   }
@@ -224,7 +279,7 @@ export async function logSearch({ user = null, webUserId = null, student }) {
   }
 }
 
-export async function getSearchHistory({ range = 'all', userId = null, webUserId = null, page = 1, pageSize = 30 } = {}) {
+export async function getSearchHistory({ range = 'all', userId = null, webUserId = null, page = 1, pageSize = 30, isAdmin = false } = {}) {
   const db = getDb();
   const conditions = [];
   const params = [];
@@ -265,7 +320,25 @@ export async function getSearchHistory({ range = 'all', userId = null, webUserId
     LIMIT $${limitIdx} OFFSET $${offsetIdx}
   `, params);
 
-  const results = dataRes.rows.map(row => {
+  const userMap = new Map();
+  if (isAdmin) {
+    const distinctWebUserIds = [...new Set(dataRes.rows.map(r => r.web_user_id).filter(Boolean))];
+    if (distinctWebUserIds.length > 0) {
+      try {
+        const uRes = await db.query(
+          'SELECT id, username, email FROM auth."User" WHERE id = ANY($1)',
+          [distinctWebUserIds]
+        );
+        for (const u of uRes.rows) {
+          userMap.set(u.id, u);
+        }
+      } catch (e) {
+        console.warn('[Query] Error fetching userMap for history:', e.message);
+      }
+    }
+  }
+
+  const results = await Promise.all(dataRes.rows.map(async (row) => {
     let student_name = row.student_name;
     if (row.student_name_enc) {
       try {
@@ -276,8 +349,25 @@ export async function getSearchHistory({ range = 'all', userId = null, webUserId
     }
     const clean = { ...row, student_name };
     delete clean.student_name_enc;
+
+    if (isAdmin) {
+      const authUser = row.web_user_id ? userMap.get(row.web_user_id) : null;
+      const searcherEmail = authUser?.email || (row.username?.includes('@') ? row.username : null);
+      const searcherScholarNo = extractScholarNo(searcherEmail) || extractScholarNo(row.username);
+      let reg = null;
+      if (searcherScholarNo) {
+        reg = await getRegistrationDetails(searcherScholarNo);
+      }
+      clean.searcher_scholar_no = searcherScholarNo || null;
+      clean.searcher_name = reg?.name || authUser?.username || row.first_name || row.username || 'User';
+      clean.searcher_email = searcherEmail || null;
+    } else {
+      delete clean.searcher_scholar_no;
+      delete clean.searcher_name;
+      delete clean.searcher_email;
+    }
     return clean;
-  });
+  }));
 
   return { results, total };
 }
@@ -292,7 +382,24 @@ export async function getHistoryByScholarNo(scholarNo) {
      ORDER BY id DESC`,
     [scholarNo.trim()]
   );
-  return res.rows.map(row => {
+
+  const distinctWebUserIds = [...new Set(res.rows.map(r => r.web_user_id).filter(Boolean))];
+  const userMap = new Map();
+  if (distinctWebUserIds.length > 0) {
+    try {
+      const uRes = await db.query(
+        'SELECT id, username, email FROM auth."User" WHERE id = ANY($1)',
+        [distinctWebUserIds]
+      );
+      for (const u of uRes.rows) {
+        userMap.set(u.id, u);
+      }
+    } catch (e) {
+      console.warn('[Query] Error fetching userMap for historyByScholar:', e.message);
+    }
+  }
+
+  const results = await Promise.all(res.rows.map(async (row) => {
     let student_name = row.student_name;
     if (row.student_name_enc) {
       try {
@@ -303,8 +410,21 @@ export async function getHistoryByScholarNo(scholarNo) {
     }
     const clean = { ...row, student_name };
     delete clean.student_name_enc;
+
+    const authUser = row.web_user_id ? userMap.get(row.web_user_id) : null;
+    const searcherEmail = authUser?.email || (row.username?.includes('@') ? row.username : null);
+    const searcherScholarNo = extractScholarNo(searcherEmail) || extractScholarNo(row.username);
+    let reg = null;
+    if (searcherScholarNo) {
+      reg = await getRegistrationDetails(searcherScholarNo);
+    }
+    clean.searcher_scholar_no = searcherScholarNo || null;
+    clean.searcher_name = reg?.name || authUser?.username || row.first_name || row.username || 'User';
+    clean.searcher_email = searcherEmail || null;
     return clean;
-  });
+  }));
+
+  return results;
 }
 
 export async function logAiQuery({

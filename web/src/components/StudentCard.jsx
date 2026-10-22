@@ -14,7 +14,7 @@ function getTornClass(id) {
 }
 
 export default function StudentCard({ student, isAdmin = false, onTrackUpdated, onPinUpdated }) {
-  const [showReg, setShowReg] = useState(false);
+  const [showReg, setShowReg] = useState(true);
   const [tracking, setTracking] = useState(false);
   const [trackMsg, setTrackMsg] = useState('');
   const [peeling, setPeeling] = useState(false);
@@ -256,82 +256,67 @@ export default function StudentCard({ student, isAdmin = false, onTrackUpdated, 
           })}
         </div>
 
-        {/* Admin registration redaction block */}
+        {/* Admin registration data block */}
         {isAdmin && student.registration && (
-          <div className="mt-6">
-            <div className="relative">
-              {/* Redaction bar */}
-              {!showReg && (
-                <div
-                  className="cursor-pointer group"
-                  onClick={handleRevealReg}
-                >
-                  <div
-                    className="font-terminal text-sm tracking-widest py-3 px-4 text-center"
-                    style={{
-                      background: peeling ? 'transparent' : '#fff',
-                      color: peeling ? 'var(--bone-60)' : '#000',
-                      transition: 'transform 400ms ease-out',
-                      transform: peeling ? 'scaleX(0)' : 'scaleX(1)',
-                      transformOrigin: 'right',
-                    }}
-                  >
-                    ADMIN CLEARANCE ONLY -- CLICK TO REVEAL
-                  </div>
-                </div>
-              )}
-
-              {/* Revealed registration data */}
-              {showReg && (
-                <div className="font-typewriter text-sm space-y-2 mt-2 pl-4" style={{ borderLeft: '2px solid var(--bone-35)' }}>
-                  <button
-                    onClick={() => setShowReg(false)}
-                    className="font-terminal text-xs tracking-wider mb-2 block"
-                    style={{ color: 'var(--bone-35)' }}
-                  >
-                    [-] CONCEAL REGISTRATION INTELLIGENCE
-                  </button>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <span style={{ color: 'var(--bone-35)' }}>GUARDIAN: </span>
-                      <span>{student.registration.guardian || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--bone-35)' }}>CATEGORY: </span>
-                      <span>{student.registration.category || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--bone-35)' }}>PHONE(S): </span>
-                      <span>{student.registration.phones?.join(', ') || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--bone-35)' }}>EMAIL(S): </span>
-                      <span>{student.registration.emails?.join(', ') || 'N/A'}</span>
-                    </div>
-                  </div>
-
-                  {student.registration.addresses && student.registration.addresses.length > 0 && (
-                    <div className="mt-3 pt-2" style={{ borderTop: '1px solid var(--bone-15)' }}>
-                      <div className="font-terminal text-xs tracking-wider mb-1" style={{ color: 'var(--bone-35)' }}>
-                        RECORDED RESIDENTIAL ADDRESSES:
-                      </div>
-                      <ul className="space-y-1 list-none pl-0">
-                        {student.registration.addresses.map((addr, aIdx) => (
-                          <li key={aIdx} className="pl-2" style={{ borderLeft: '2px solid var(--bone-15)' }}>
-                            {addr.text}
-                            {addr.semesters && addr.semesters.length > 0 && (
-                              <span className="text-xs ml-2" style={{ color: 'var(--bone-35)' }}>
-                                [Sem: {addr.semesters.join(', ')}]
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
+          <div className="mt-6 border-t border-white/20 pt-4 font-terminal">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-2 text-xs tracking-wider font-bold">
+                <span className="bg-white text-black px-1.5 py-0.5">ADMIN INTELLIGENCE</span>
+                <span className="text-white/60">REGISTRATION MASTER RECORD</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReg(!showReg)}
+                className="text-[11px] font-mono text-white/50 hover:text-white underline cursor-pointer"
+              >
+                {showReg ? '[-] CONCEAL' : '[+] EXPAND'}
+              </button>
             </div>
+
+            {showReg && (
+              <div className="font-mono text-xs space-y-2.5 p-3.5 bg-white/5 border border-white/10">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <span className="text-white/40 block text-[10px]">CANDIDATE NAME:</span>
+                    <span className="text-white font-bold">{student.registration.name || student.name || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/40 block text-[10px]">FATHER'S NAME:</span>
+                    <span className="text-white font-bold">{student.registration.fatherName || student.registration.guardian || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/40 block text-[10px]">CATEGORY:</span>
+                    <span className="text-white font-bold">{student.registration.category || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-white/40 block text-[10px]">CONTACT NO:</span>
+                    <span className="text-white font-bold">{student.registration.phones?.join(', ') || student.registration.phoneNumbers?.join(', ') || 'N/A'}</span>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-white/40 block text-[10px]">REGISTERED EMAIL(S):</span>
+                    <span className="text-white font-bold">{student.registration.emails?.join(', ') || 'N/A'}</span>
+                  </div>
+                </div>
+
+                {student.registration.addresses && student.registration.addresses.length > 0 && (
+                  <div className="pt-2 border-t border-white/10">
+                    <span className="text-white/40 block text-[10px] mb-1">RECORDED RESIDENTIAL ADDRESS(ES):</span>
+                    <ul className="space-y-1 pl-0 list-none">
+                      {student.registration.addresses.map((addr, aIdx) => (
+                        <li key={aIdx} className="text-white/90 text-xs pl-2 border-l border-white/20">
+                          {addr.text}
+                          {addr.semesters && addr.semesters.length > 0 && (
+                            <span className="text-[11px] text-white/40 ml-2">
+                              [Sem: {addr.semesters.join(', ')}]
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

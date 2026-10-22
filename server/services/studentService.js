@@ -1,10 +1,10 @@
 import { getByScholarNo, searchUnifiedStudents, logSearch, isSpecialScholar, getHistoryByScholarNo, extractFailedSubjects } from '../core/query.js';
 import { getDb } from '../core/db.js';
-import { getRegistrationByScholarNo } from '../core/registration.js';
+import { getRegistrationDetails } from './identityService.js';
 
 export function serializeStudent(student, user) {
   if (!student) return null;
-  const { registration, ...publicFields } = student;
+  const { registration, regData, ...publicFields } = student;
   return user?.role === 'ADMIN' ? { ...publicFields, registration } : publicFields;
 }
 import { settingsService } from './settingsService.js';
@@ -109,19 +109,22 @@ export const studentService = {
 
       // Fallback: Check registration data for ADMIN
       if (user.role === 'ADMIN') {
-        const reg = getRegistrationByScholarNo(cleanNo);
+        const reg = await getRegistrationDetails(cleanNo);
         if (reg) {
           return {
             scholarNo: cleanNo,
             name: reg.name || 'REGISTERED STUDENT',
             degree: 'N/A',
-            branch: 'N/A',
+            branch: reg.course || 'N/A',
             semesters: [],
             cpi: null,
             registration: {
+              name: reg.name,
+              fatherName: reg.fatherName || reg.guardian || null,
               guardian: reg.guardian || reg.fatherName || null,
               category: reg.category || null,
               phones: reg.phones || [],
+              phoneNumbers: reg.phones || [],
               emails: reg.emails || [],
               addresses: reg.addresses || []
             }
@@ -180,12 +183,15 @@ export const studentService = {
 
     let registrationData = null;
     if (user.role === 'ADMIN') {
-      const reg = getRegistrationByScholarNo(cleanNo);
+      const reg = await getRegistrationDetails(cleanNo);
       if (reg) {
         registrationData = {
+          name: reg.name,
+          fatherName: reg.fatherName || reg.guardian || null,
           guardian: reg.guardian || reg.fatherName || null,
           category: reg.category || null,
           phones: reg.phones || [],
+          phoneNumbers: reg.phones || [],
           emails: reg.emails || [],
           addresses: reg.addresses || []
         };
@@ -222,8 +228,35 @@ export const studentService = {
     const isUserAdmin = user.role === 'ADMIN';
     const result = await searchUnifiedStudents(q, pageNum, limit, isUserAdmin, filters);
 
+    // If admin, enrich each search result with full registration data
+    if (isUserAdmin && result.results && result.results.length > 0) {
+      await Promise.all(result.results.map(async (item) => {
+        try {
+          const reg = await getRegistrationDetails(item.scholar_no);
+          if (reg) {
+            item.registration = {
+              name: reg.name,
+              fatherName: reg.fatherName || reg.guardian || null,
+              guardian: reg.guardian || reg.fatherName || null,
+              category: reg.category || null,
+              phones: reg.phones || [],
+              phoneNumbers: reg.phones || [],
+              emails: reg.emails || [],
+              addresses: reg.addresses || []
+            };
+          }
+        } catch {}
+      }));
+    } else if (!isUserAdmin && result.results) {
+      // Guarantee zero registration data leaks for non-admins
+      result.results.forEach((item) => {
+        delete item.registration;
+        delete item.regData;
+      });
+    }
+
     let studentCard = null;
-    if (result.total === 1 && result.results.length === 1 && !result.results[0].isRegistrationOnly) {
+    if (result.total === 1 && result.results.length === 1 && (!result.results[0].isRegistrationOnly || user.role === 'ADMIN')) {
       try {
         studentCard = await this.getByScholar(result.results[0].scholar_no, user);
       } catch {}

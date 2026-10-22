@@ -17,7 +17,8 @@ router.get('/history', async (req, res, next) => {
       range,
       userId,
       page: parseInt(page, 10) || 1,
-      pageSize: parseInt(pageSize, 10) || 30
+      pageSize: parseInt(pageSize, 10) || 30,
+      isAdmin: true
     });
     res.json({ success: true, data: result });
   } catch (err) {

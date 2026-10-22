@@ -472,20 +472,47 @@ export default function Search({ user }) {
                       <div
                         key={idx}
                         onClick={() => handleSelectScholar(item.scholar_no)}
-                        className="flex flex-wrap items-baseline justify-between py-3 cursor-pointer transition-colors hover:bg-white hover:text-black group"
-                        style={{ borderBottom: '1px solid var(--bone-15)' }}
+                        className="py-3 cursor-pointer transition-colors hover:bg-white/5 border-b border-white/10 group px-2"
                       >
-                        <div className="flex items-baseline gap-3">
-                          <span className="font-terminal text-base tracking-wider font-bold">{item.name}</span>
-                          {isItemPinned && (
-                            <span className="font-mono text-[12px] px-1.5 py-0.2 bg-white text-black font-bold">
-                              [ PINNED ]
-                            </span>
-                          )}
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <div className="flex items-baseline gap-3">
+                            <span className="font-terminal text-base tracking-wider font-bold group-hover:text-white">{item.name}</span>
+                            {isItemPinned && (
+                              <span className="font-mono text-[12px] px-1.5 py-0.2 bg-white text-black font-bold">
+                                [ PINNED ]
+                              </span>
+                            )}
+                            {item.isRegistrationOnly && (
+                              <span className="font-mono text-[10px] px-1 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                                REGISTRY RECORD
+                              </span>
+                            )}
+                          </div>
+                          <div className="font-typewriter text-xs font-terminal tracking-wider text-white/60">
+                            {item.scholar_no}
+                          </div>
                         </div>
-                        <div className="font-typewriter text-xs font-terminal tracking-wider" style={{ color: 'var(--bone-60)' }}>
-                          {item.scholar_no}
-                        </div>
+
+                        {/* Admin-only Registration Intelligence row */}
+                        {user?.role === 'ADMIN' && item.registration && (
+                          <div className="mt-2 text-[11px] font-mono text-white/50 group-hover:text-white/80 flex flex-wrap gap-x-4 gap-y-1">
+                            {item.registration.fatherName && (
+                              <span><strong className="text-white/40">FATHER:</strong> {item.registration.fatherName}</span>
+                            )}
+                            {item.registration.category && (
+                              <span><strong className="text-white/40">CAT:</strong> {item.registration.category}</span>
+                            )}
+                            {item.registration.phones?.[0] && (
+                              <span><strong className="text-white/40">PHONE:</strong> {item.registration.phones[0]}</span>
+                            )}
+                            {item.registration.emails?.[0] && (
+                              <span><strong className="text-white/40">EMAIL:</strong> {item.registration.emails[0]}</span>
+                            )}
+                            {item.registration.addresses?.[0]?.text && (
+                              <span className="truncate max-w-sm"><strong className="text-white/40">ADDR:</strong> {item.registration.addresses[0].text}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
