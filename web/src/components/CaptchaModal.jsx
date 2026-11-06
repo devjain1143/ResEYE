@@ -59,11 +59,12 @@ export default function CaptchaModal() {
           </div>
         )}
 
-        <div className="my-6 flex flex-col items-center justify-center p-4 border border-white/20 bg-white/5 text-center">
+        <div className="my-6 flex flex-col items-center justify-center p-4 border border-white/20 bg-white/5 text-center min-h-[70px]">
           <Turnstile
+            id="turnstile-modal-widget"
             ref={widgetRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-            options={{ action: 'search', theme: 'dark', appearance: 'interaction-only' }}
+            options={{ action: 'search', theme: 'dark', appearance: 'always', size: 'flexible' }}
             onSuccess={handleVerify}
             onError={(err) => setError(`Verification failed (${err || 'challenge rejected'}).`)}
             onExpire={() => widgetRef.current?.reset()}

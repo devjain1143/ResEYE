@@ -665,11 +665,12 @@ export default function Search({ user }) {
 
       {/* Background Turnstile Verification Container */}
       {captchaActive && !captchaVerified && (
-        <div className="flex justify-center my-2">
+        <div className="flex flex-col items-center justify-center my-2 min-h-[70px]">
           <Turnstile
+            id="turnstile-search-widget"
             ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-            options={{ action: 'search', theme: 'dark', appearance: 'interaction-only' }}
+            options={{ action: 'search', theme: 'dark', appearance: 'always', size: 'flexible' }}
             onSuccess={handleTurnstileSuccess}
             onError={(err) => {
               console.warn('[Turnstile] Challenge error:', err);

@@ -17,6 +17,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendLoading, setResendLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.innerWidth < 768 ||
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    );
+  });
 
   const widgetRef = useRef(null);
   const tokenResolverRef = useRef(null);
@@ -29,7 +36,17 @@ export default function Register() {
         setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
       }, 1000);
     }
-    return () => clearInterval(timer);
+    const handleResize = () => {
+      setIsMobile(
+        window.innerWidth < 768 ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      );
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [resendCooldown]);
 
   const handleRegister = async (e) => {
@@ -58,8 +75,14 @@ export default function Register() {
       if (!activeToken) {
         activeToken = await new Promise((resolve) => {
           tokenResolverRef.current = resolve;
-          setTimeout(() => resolve(null), 3500);
+          setTimeout(() => resolve(null), 10000);
         });
+      }
+
+      if (!activeToken) {
+        setError('FAULT: PLEASE COMPLETE THE HUMAN VERIFICATION CHALLENGE ABOVE.');
+        setLoading(false);
+        return;
       }
 
       const res = await api('/auth/register', {
@@ -177,14 +200,24 @@ export default function Register() {
               />
             </div>
 
-            <div className="flex justify-center my-2">
+            <div className={`flex flex-col items-center justify-center ${isMobile ? 'my-3 min-h-[70px] w-full' : 'my-1'}`}>
               <Turnstile
+                id="turnstile-register-widget"
                 ref={widgetRef}
                 siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-                options={{ action: 'register', theme: 'dark', appearance: 'interaction-only' }}
+                options={{
+                  action: 'register',
+                  theme: 'dark',
+                  appearance: isMobile ? 'always' : 'interaction-only',
+                  size: isMobile ? 'flexible' : 'normal'
+                }}
                 onSuccess={(t) => {
                   setToken(t);
-                  if (tokenResolverRef.current) tokenResolverRef.current(t);
+                  if (tokenResolverRef.current) {
+                    tokenResolverRef.current(t);
+                    tokenResolverRef.current = null;
+                  }
+                  setError((prev) => (prev.includes('HUMAN VERIFICATION') ? '' : prev));
                 }}
                 onError={(err) => {
                   console.warn('[Turnstile register]', err);
@@ -201,7 +234,7 @@ export default function Register() {
               disabled={loading}
               className="btn-primary w-full mt-2"
             >
-              {loading ? 'TRANSMITTING...' : 'ENROLL CREDENTIALS >>'}
+              {loading ? (!token ? 'VERIFYING CLEARANCE...' : 'TRANSMITTING...') : 'ENROLL CREDENTIALS >>'}
             </button>
           </form>
         ) : (

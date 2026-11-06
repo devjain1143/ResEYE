@@ -25,6 +25,13 @@ export default function Login({ onAuthSuccess }) {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState('');
   const [forgotError, setForgotError] = useState('');
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.innerWidth < 768 ||
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    );
+  });
 
   const widgetRef = useRef(null);
   const googleWidgetRef = useRef(null);
@@ -64,6 +71,15 @@ export default function Login({ onAuthSuccess }) {
         }
       })
       .catch(() => {});
+
+    const handleResize = () => {
+      setIsMobile(
+        window.innerWidth < 768 ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      );
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [searchParams, location.state]);
 
   const handleLogin = async (e) => {
@@ -83,8 +99,15 @@ export default function Login({ onAuthSuccess }) {
       if (!activeToken) {
         activeToken = await new Promise((resolve) => {
           tokenResolverRef.current = resolve;
-          setTimeout(() => resolve(null), 3500);
+          setTimeout(() => resolve(null), 10000);
         });
+      }
+
+      if (!activeToken) {
+        setError('FAULT: PLEASE COMPLETE THE HUMAN VERIFICATION CHALLENGE ABOVE.');
+        setStare(true);
+        setLoading(false);
+        return;
       }
 
       const res = await api('/auth/login', {
@@ -147,8 +170,14 @@ export default function Login({ onAuthSuccess }) {
       if (!activeToken) {
         activeToken = await new Promise((resolve) => {
           googleTokenResolverRef.current = resolve;
-          setTimeout(() => resolve(null), 3500);
+          setTimeout(() => resolve(null), 10000);
         });
+      }
+
+      if (!activeToken) {
+        setError('FAULT: PLEASE COMPLETE THE HUMAN VERIFICATION CHALLENGE.');
+        setGoogleLoading(false);
+        return;
       }
 
       await api('/auth/google/prepare', {
@@ -333,14 +362,24 @@ export default function Login({ onAuthSuccess }) {
               />
             </div>
 
-            <div className="flex justify-center my-2">
+            <div className={`flex flex-col items-center justify-center ${isMobile ? 'my-3 min-h-[70px] w-full' : 'my-1'}`}>
               <Turnstile
+                id="turnstile-login-widget"
                 ref={widgetRef}
                 siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-                options={{ action: 'login', theme: 'dark', appearance: 'interaction-only' }}
+                options={{
+                  action: 'login',
+                  theme: 'dark',
+                  appearance: isMobile ? 'always' : 'interaction-only',
+                  size: isMobile ? 'flexible' : 'normal'
+                }}
                 onSuccess={(t) => {
                   setToken(t);
-                  if (tokenResolverRef.current) tokenResolverRef.current(t);
+                  if (tokenResolverRef.current) {
+                    tokenResolverRef.current(t);
+                    tokenResolverRef.current = null;
+                  }
+                  setError((prev) => (prev.includes('HUMAN VERIFICATION') ? '' : prev));
                 }}
                 onError={(err) => {
                   console.warn('[Turnstile login]', err);
@@ -357,21 +396,25 @@ export default function Login({ onAuthSuccess }) {
               disabled={loading}
               className="btn-primary w-full mt-2 glitch"
               data-corruptible="true"
-              data-text={loading ? 'AUTHENTICATING...' : 'SIGN IN >>'}
+              data-text={loading ? (!token ? 'VERIFYING CLEARANCE...' : 'AUTHENTICATING...') : 'SIGN IN >>'}
             >
-              {loading ? 'AUTHENTICATING...' : 'SIGN IN >>'}
+              {loading ? (!token ? 'VERIFYING CLEARANCE...' : 'AUTHENTICATING...') : 'SIGN IN >>'}
             </button>
           </form>
 
           {googleEnabled && (
             <div className="flex justify-center my-1">
               <Turnstile
+                id="turnstile-google-widget"
                 ref={googleWidgetRef}
                 siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAFcO6VeDG_Psrewy'}
-                options={{ action: 'google', theme: 'dark', appearance: 'interaction-only' }}
+                options={{ action: 'google', theme: 'dark', appearance: 'interaction-only', size: 'flexible' }}
                 onSuccess={(t) => {
                   setGoogleToken(t);
-                  if (googleTokenResolverRef.current) googleTokenResolverRef.current(t);
+                  if (googleTokenResolverRef.current) {
+                    googleTokenResolverRef.current(t);
+                    googleTokenResolverRef.current = null;
+                  }
                 }}
                 onExpire={() => {
                   setGoogleToken(null);
